@@ -5,8 +5,8 @@ This is the repository for pyMMAX2, a Python API for MMAX2. pyMMAX2 is introduce
 **Currently under construction, stay tuned!**
 
 ### Installation
-Perform the following steps for a minimal installation. 
+Perform the following steps for a minimal installation. For actual applications, simply install pyMMAX2 and its required dependencies (if not installed already) into your working environment.
 
 ```
-$ conda create --name pymmax2 python=3.6
+$ conda create --name pymmax2 python=3.6 colorama beautifulsoup4 regex jpype1
 ```
