@@ -25,7 +25,7 @@ if args.mmax_dir:
 	files = [f for f in glob(args.mmax_dir+'**', recursive=True) if f.endswith(".mmax")]
 else:
 	files=[args.mmax_file]
-print(files)
+
 for f in files:
 	pd = MMAX2Discourse(f, common_paths=args.common_paths, mmax2_java_binding=jpype)
 	try:
