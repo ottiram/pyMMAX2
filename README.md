@@ -13,4 +13,5 @@ $ source activate pymmax2
 $ git clone https://github.com/nlpAThits/pyMMAX2.git
 $ cd pyMMAX2
 $ pip install .
+$ pip install lxml
 ```
