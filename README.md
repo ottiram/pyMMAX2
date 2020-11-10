@@ -15,3 +15,5 @@ $ git clone https://github.com/nlpAThits/pyMMAX2.git
 $ cd pyMMAX2
 $ pip install .
 ```
+
+If you want to use the JPype-based integration of the MMAX2 annotation scheme business logic, e.g. for purposes of validation, you need a current MMAX2 version. This can be downloaded from <a href="https://github.com/nlpAThits/MMAX2">here</a>.
