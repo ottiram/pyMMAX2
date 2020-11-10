@@ -4,6 +4,6 @@ This is the repository for pyMMAX2, a Python API for MMAX2. pyMMAX2 is introduce
 
 **Currently under construction, stay tuned!**
 
-´´´
+```
 $ conda create --name pymmax2 python=3.6
-´´´
+```
