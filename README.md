@@ -17,4 +17,5 @@ $ pip install .
 ```
 
 If you want to use the JPype-based integration of the MMAX2 annotation scheme business logic (recommended), you need a current MMAX2 version, which can be downloaded from <a href="https://github.com/nlpAThits/MMAX2">here</a>.
+
 MMAX2 does not require any installation, and comes with all necessary libraries. 
