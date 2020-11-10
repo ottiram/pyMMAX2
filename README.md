@@ -10,5 +10,7 @@ Perform the following steps for a minimal installation. For actual applications,
 ```
 $ conda create --name pymmax2 python=3.6 colorama beautifulsoup4 regex jpype1
 $ source activate pymmax2
-$ git clone 
+$ git clone https://github.com/nlpAThits/pyMMAX2.git
+$ cd pyMMAX2
+$ pip install .
 ```
