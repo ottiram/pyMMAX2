@@ -425,8 +425,8 @@ class MMAX2MarkableLevel(object):
 				empty_span=False
 				# Go over all existing markables (if any)
 				for m in self.BASEDATA2MARKABLELISTS.get(bd,[]):
-					# Check for complete identify, which is always illegal (on the same level!!)
-					if m.get_span() == spanlists_to_span(spanlists) and m.get_attributes() == attribs:
+					# Check for identify, which is always illegal (on the same level!!)
+					if m.get_span() == spanlists_to_span(spanlists):# and m.get_attributes() == attribs:
 						existing=m
 						break
 					if not allow_overlap and overlap(m.get_span(),spanlists_to_span(spanlists),self.get_discourse().get_basedata() ):
