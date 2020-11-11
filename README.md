@@ -20,7 +20,7 @@ If you want to use the JPype-based integration of the MMAX2 annotation scheme bu
 MMAX2 does not require any installation, and comes with all necessary libraries. 
 
 The following example uses the streamlined version of the ACL Anthology coref dataset (original available <a href="https://www.aclweb.org/anthology/C12-2103/">here</a>) from the <a href="https://github.com/nlpAThits/MMAX2-Showcase">MMAX2-Showcase</a> project. 
-Note that the `--common_paths` parameter is used to supply a global common_paths.xml file (not present in the original dataset).
+Note that the `--common_paths` parameter is used to supply a **global** common_paths.xml file (not present in the original dataset). This is the recommended practice for large collections of homogeneous MMAX2 datasets, because it renders unnecessary the large number of identical style, scheme, customization, and common_paths files, allowing modifications in one place for the entire collection.
 ```
 $ python load_mmax.py \
    --mmax_file ../MMAX2-Showcase/acl_anthology_coref_coling_2012/C/C02-1016/C02-1016.mmax \
@@ -36,7 +36,7 @@ Markable levels   :
 ```
 The script just loads one .mmax file and prints some project info to the console. Since no MMAX2 libraries base folder is specified using the `--mmax2_libs` parameter, default attributes for the two markable levels **coref** and **sentences** are not available. 
 
-Compare the above to the behaviour of the following command, which __does__ specify the MMAX2 libraries base folder, causing Java-based annotation scheme handling to be executed in the background. 
+Compare the above to the behaviour of the following command, which *does* specify the MMAX2 libraries base folder, causing Java-based annotation scheme handling to be executed in the background. 
 The effects are two-fold: 
 First, info messages from the Java code are printed to the console.
 Second, default attributes for both markable levels are determined from the annotation scheme xml files (as specified in global_common_paths.xml), and displayed with the project info.
@@ -63,6 +63,7 @@ MMAX2 Project Info:
 .mmax file        : ../MMAX2-Showcase/acl_anthology_coref_coling_2012/C/C02-1016/C02-1016.mmax
 Basedata elements : 4222
 Markable levels   :
- coref            : 267 markables [default: NP_Form:none, Coref_class:empty, Sure:yes]
+ coref            : 267 markables [default: <>NP_Form:none, Sure:yes]
  sentence         : 195 markables [default: imported_tag_type:]
 ```
+Note that the coref_scheme.xml in the [MMAX2-Showcase] has been modified compared to the original, making the coref_class attribute dependent
