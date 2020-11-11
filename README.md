@@ -66,4 +66,5 @@ Markable levels   :
  coref            : 267 markables [default: <>NP_Form:none, Sure:yes]
  sentence         : 195 markables [default: imported_tag_type:]
 ```
-Note that the coref_scheme.xml in the [MMAX2-Showcase] has been modified compared to the original, making the coref_class attribute dependent
+Note that the coref_scheme.xml in the [MMAX2-Showcase](github.com/nlpAThits/MMAX2-Showcase) has been modified compared to the original scheme file, by making the **coref_class** attribute *dependent* on the **np_form** attribute having a non-default value.
+This makes **np_form** a (in MMAX2 parlance) _branching_ attribute, which is visible in the `<>` prefix to the **np_form** attribute name above.
