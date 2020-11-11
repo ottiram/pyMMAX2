@@ -18,8 +18,6 @@ if args.mmax2_libs:
 	for f in [f for f in glob(args.mmax2_libs+'**', recursive=True) if f.endswith(".jar")]:
 		MMAX2_CLASSPATH+=f+":"	# use ; instead of : for Windows
 	jpype.startJVM(jpype.getDefaultJVMPath(), "-Djava.class.path="+MMAX2_CLASSPATH)
-else:
-	jpype=None
 
 if args.mmax_dir:
 	files = [f for f in glob(args.mmax_dir+'**', recursive=True) if f.endswith(".mmax")]
@@ -27,7 +25,7 @@ else:
 	files=[args.mmax_file]
 
 for f in files:
-	pd = MMAX2Discourse(f, common_paths=args.common_paths, mmax2_java_binding=jpype)
+	pd = MMAX2Discourse(f, common_paths=args.common_paths, mmax2_java_binding=jpype if jpype.isJVMStarted() else None)
 	try:
 		pd.load_markables()
 	except MultipleInvalidMMAX2AttributeExceptions as mive:
