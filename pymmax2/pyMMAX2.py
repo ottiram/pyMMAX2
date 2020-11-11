@@ -40,16 +40,14 @@ STYLE_STUB 			= '<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform
                        </xsl:template>\n\
                        </xsl:stylesheet>'
 
-
-
 #####################################################
 class MMAX2Discourse(object):                       #
 # Main entry point to access .mmax file from Python	#
 #####################################################
-# If mmax2_java_binding is available, this will create a native J_MMAX2DISCOURSE instance
-# to enable access to the native attribute panels.	
-	def __init__(self, mmax2file, common_paths="", verbose=False, 
-		max_size=-1, mmax2_java_binding=None):
+	# If mmax2_java_binding is available, this will create a 
+	# native J_MMAX2DISCOURSE instance to enable access 
+	# to the native attribute panels.	
+	def __init__(self, mmax2file, common_paths="", verbose=False, max_size=-1, mmax2_java_binding=None):
 		if verbose: 
 			print(f'\n{Back.GREEN}{Fore.BLACK}{Style.NORMAL}This is {Fore.RED}{Style.BRIGHT}pyMMAX2{Fore.BLACK}{Style.NORMAL}'+
 				' version '+pkg_resources.require("PyMMAX2")[0].version+f'{Style.RESET_ALL}', 
@@ -57,7 +55,7 @@ class MMAX2Discourse(object):                       #
 		self.MMAX2_PROJECT			=	None
 		self.COMMONPATHS   			= 	None
 		# These are the main references to these two objects
-		self.MMAX2_JAVA_BINDING 	=	mmax2_java_binding
+		self.MMAX2_JAVA_BINDING 	=	mmax2_java_binding # This is the jpype reference
 		self.J_MMAX2DISCOURSE		=	None
 
 		if self.MMAX2_JAVA_BINDING != None:
@@ -97,21 +95,17 @@ class MMAX2Discourse(object):                       #
 			if verbose: print("\tLoaded "+str(bd_size)+" basedata elements", file=sys.stderr)
 		self.COMMONPATHS   = cp 
 
-
-#		multi_val_exceptions=MultipleInvalidMMAX2AttributeExceptions()
-#		# This will also load all markables, and init the java-based annotation 
-#		# scheme class, if mmax2_java_binding is available on DISCOURSE
-#		cp.initialize(proj, multi_val_exceptions, verbose=verbose)
-#		self.COMMONPATHS   = cp 
-#		if multi_val_exceptions.has_exceptions():
-#			raise multi_val_exceptions
-
+	# De-coupling the loading of markables (which always includes validation) 
+	# from MMAX2Discourse creation is required to allow the creation of a MMAX2Discourse
+	# object with invalid attributes. Otherwise, a validation exception would have to be
+	# raised from the MMAX2Discourse 'constructor'.
 	def load_markables(self, verbose=False):
+		# This will collect individual InvalidMMX2AttributeException instances, if any, 
+		# and be raised if at least one of these occurred.
 		multi_val_exceptions=MultipleInvalidMMAX2AttributeExceptions()
 		# This will also load all markables, and init the java-based annotation 
 		# scheme class, if mmax2_java_binding is available on DISCOURSE
 		self.COMMONPATHS.initialize(self.MMAX2_PROJECT, multi_val_exceptions, verbose=verbose)
-#		self.COMMONPATHS   = cp 
 		if multi_val_exceptions.get_exception_count()>0:
 			raise multi_val_exceptions
 
@@ -414,7 +408,7 @@ class MMAX2MarkableLevel(object):
 	# This adds mmax_level automatically to every Markable object
 	# This is the only method that calls the MMAX2Markable constructor.
 	# No validation is done here, since no attributes are processed
-	def add_markable(self, spanlists, m_id="", allow_overlap=True, verbose=False):
+	def add_markable(self, spanlists, m_id="", allow_overlap=True, allow_duplicate_spans=False, verbose=False):
 		existing, overlapping 	= None, None
 		empty_span 				= True	# Assume empty span at first
 		# Go over span of new markable
@@ -425,8 +419,8 @@ class MMAX2MarkableLevel(object):
 				empty_span=False
 				# Go over all existing markables (if any)
 				for m in self.BASEDATA2MARKABLELISTS.get(bd,[]):
-					# Check for identify, which is always illegal (on the same level!!)
-					if m.get_span() == spanlists_to_span(spanlists):# and m.get_attributes() == attribs:
+					# Check for identity, which is illegal (on the same level!!) if allow_duplicate_spans == False
+					if not allow_duplicate_spans and m.get_span() == spanlists_to_span(spanlists) :# and m.get_attributes() == attribs:
 						existing=m
 						break
 					if not allow_overlap and overlap(m.get_span(),spanlists_to_span(spanlists),self.get_discourse().get_basedata() ):
@@ -475,7 +469,7 @@ class MMAX2MarkableLevel(object):
 	def get_mmax2_java_binding(self):
 		return self.MMAX2_JAVA_BINDING
 
-	# Basedata is required to correctly expand markable spans
+	# Basedata is required here to correctly expand markable spans
 	def load_markables(self, markable_path, basedata, multi_val_exceptions, verbose=False):
 		if verbose: print("Loading markables from", markable_path+self.FILE, file=sys.stderr)
 		try:
@@ -484,15 +478,20 @@ class MMAX2MarkableLevel(object):
 				self.NAMESPACE='xmlns="'+soup.find("markables")['xmlns']+'"'
 				dtype=[item for item in soup.contents]# if isinstance(item, bs.Doctype)]
 				self.DTD_PATH=dtype[1].split(" ")[2]
+				# Go over all markables in xml file
 				for m in soup.find_all("markable"):
+					# Get all attributes from xml, and make copy because dict will be modified in what follows.
 					attrs=m.attrs.copy()
 					# This is a meta attribute not stored in the attributes dict
-					del attrs['mmax_level']
+					#del attrs['mmax_level']
+					attrs.pop('mmax_level')
 					# Dito
 					spanlists=span_to_spanlists(attrs.pop('span'),basedata)
 					# Make sure to add the markable from file with the same id, such that pointers are not broken
 					id_from_file=attrs.pop('id')
 					# newly_added is True if new_m has been newly added
+					# Add markable, w/o any attributes yet!
+					# This will fail if the span is empty, 
 					(newly_added, new_m) = self.add_markable(spanlists, m_id=id_from_file, verbose=verbose, allow_overlap=True)
 					if newly_added:
 						try:
@@ -804,6 +803,11 @@ class MMAX2CommonPaths(object):                               #
 	def get_commonpaths_path(self):
 		return os.path.dirname(self.FILE)+"/"
 
+	# This is called by the load_markables() method of the MMAX2Discourse constructor.
+	# It expands the markable file variable ($), if it exists, and calls
+	# load_markables() on every level.
+	# multi_val_exceptions is passed to each of the latter calls, collecting all 
+	# markable-level validation errors.
 	def initialize(self, mmax2proj, multi_val_exceptions, verbose=False):
 		for ml in self.MARKABLELEVELS:
 			# Replace project name placeholder $ with actual project names
@@ -816,10 +820,7 @@ class MMAX2CommonPaths(object):                               #
 					print(f'\t{Back.GREEN}{Fore.BLACK}{Style.BRIGHT}SUCCESS{Style.RESET_ALL}', file=sys.stderr)
 				else:
 					print(f'\t{Back.RED}{Fore.BLACK}{Style.BRIGHT}FAILURE{Style.RESET_ALL}', file=sys.stderr)
-#			try:
 			ml.load_markables(mmax2proj.get_mmax2_path()+self.MARKABLE_PATH, mmax2proj.get_basedata(bdtype="words"), multi_val_exceptions, verbose=verbose)
-#			except MultipleInvalidMMAX2AttributesExceptions:
-#				raise
 
 	def append_markable_level(self, ml):
 		self.MARKABLELEVELS.append(ml)
@@ -1176,9 +1177,6 @@ class PhraseAnnotator(object):
 						print("Found phrase '%s' from %s to %s"%(ngram,str(o), str(n-1)))
 					spanlist=[bd[1] for bd in bdata.DCELEMENTS[o:ngram]]
 					targetlevel.add_markable([spanlist], attribs)			
-
-
-
 
 def kwic_string_for_elements(bd_id_list, basedata, width=5, fillwidth=100, lsep="_>>", rsep="<<_"):
 # continuous elements only

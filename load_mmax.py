@@ -32,5 +32,3 @@ for f in files:
 		print('%s exceptions, e.g.\n%s'%(str(mive.get_exception_count()),
 			                             str(mive.get_exception_at(0)).strip()))
 	pd.info()
-
-
