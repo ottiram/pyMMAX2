@@ -196,7 +196,6 @@ class MMAX2Discourse(object):                       #
 		return all_results
 
 
-
 	def add_markable_level(self, name, namespace="", scheme="", customization="", create_if_missing=False, encoding='utf-8', dtd_path='"markables.dtd"'):
 		ml = MMAX2MarkableLevel(name,
 							self,
@@ -330,61 +329,65 @@ class MMAX2MarkableLevel(object):
 	# Algorithm: 
 	# Go over all default attributes in order.
 	# Go over all existing attributes in dict, and try to consume them, by setting their current value to the scheme attribute
-	# For branching attributes, this will activate potential dependent attributes
-	def validate(self, av_atts):
+	# For branching attributes, this will activate potential dependent attributes, which will be processed recursively
+	def validate(self, supplied):
 		validation_errors=False
 		# av_atts is a dict of plain a-v pairs, representing a markable's attributes on the python/xml level.
 		# Copy, because it will be modified		
-		supplied_av_atts = av_atts.copy()
-#		print("In:", av_atts)
-		consumed 	= []
-		invalid 	= {}
+		invalid 	= supplied.copy()	# Should be empty after validation
+		consumed 	= []	# Stores names of attributes that had valid values and could be consumed; will be removed from remaining later
+#		invalid 	= {}	# a-v pairs with existing attributes but invalid values
 		valid 		= {}
-		if self.J_MMAX2ATTRIBUTEPANEL != None:			
+		missing 	= {}	# a-v pairs required by default or as the result of branching attribute setting, but missing in supplied
+		if self.J_MMAX2ATTRIBUTEPANEL != None:
 			# Reset (invisible) panel to only contain independent attributes with default values.
 			self.J_MMAX2ATTRIBUTEPANEL.displayMarkableAttributes(None)
 			# Get all default attributes initially. List might be extended in the following.
+			# Order is defined by the annotation scheme xml
 			current_j_attributes = self.J_MMAX2ATTRIBUTEPANEL.getAllCurrentAttributes()
 			ai=0
+			# Until all attributes have been processed, including dependent ones
 			while ai < len(current_j_attributes):
-#				print("Scheme attributes:", len(current_j_attributes))
 				# Get current attribute from scheme
 				a=current_j_attributes[ai]
 				lcn = a.getLowerCasedAttributeName()
+#				print(lcn)
+				# If this scheme-attribute was found on supplied or not
+				lcn_found = False
 				# Go over all plain attributes to be validated
-				for catt_key in supplied_av_atts.keys():
-					if catt_key.lower() == lcn:
-						# The current default attribute was found in the existing ones.
+				for catt_key in invalid.keys():
+					if str(catt_key).lower() == lcn:
+						lcn_found=True
+#						print("Found",lcn)
+						# The current default attribute was found in the supplied ones.
 						# Try to set supplied value to attribute in scheme.
 						# This will fail if the supplied value is not defined
-#						print("Before", a.getSelectedValue())
-						a.setSelectedValue(supplied_av_atts[catt_key],True)
-						# If this is false, setting the value did not work.
-						if a.getSelectedValue()!=supplied_av_atts[catt_key]:
-#							print("Value",catts[catt_key],"is not allowed for", lcn, file=sys.stderr)
-							invalid[catt_key]=supplied_av_atts[catt_key]
+						a.setSelectedValue(invalid[catt_key],True)
+						# If the two values are not identical, setting the value did not work (=invalid)
+						if a.getSelectedValue()!=invalid[catt_key]:
+							# The current supplied attribute does exist, but it has an invalid value, and will not be consumed
+							invalid[catt_key]=invalid[catt_key]
 							validation_errors=True
 						else:
 							# catt_key has been consumed successfully
 							consumed.append(catt_key)
-							valid[catt_key]=supplied_av_atts[catt_key]
+							valid[catt_key]=invalid[catt_key]
 						if a.getIsBranching():
 							# Other, dependent attributes might exist for this attribute it if has the current value
 							for dep in a.getNextAttributes(False):
 								current_j_attributes.append(dep)
-						# Get value of current default attribute
-#						print("After", a.getSelectedValue())
+				if not lcn_found:
+					missing[lcn]=a.getSelectedValue()
 				ai+=1
 			for i in consumed:
-				del supplied_av_atts[i]
+				del invalid[i]
 
-			# Make sure that *extra* attributes which could not be consumed also trigger a validation exception
-			if len(supplied_av_atts)>0:
+			# Make sure that *extra* attributes which could not be consumed also trigger a validation exception,
+			# just like missing ones
+			if len(invalid)>0 or len(missing)>0:
 				validation_errors=True
-#		else:
-#			print("Validation not possible!", file=sys.stderr)
-
-		return validation_errors, valid, supplied_av_atts, av_atts
+		# validation_errors, valid, extra, supplied = self.LEVEL.validate(attrib_dict)
+		return validation_errors, supplied, valid, invalid, missing
 
 	# This returns (None, None) if no connection to annotation scheme is available,
 	# and (empty list, empty dict) if no attributes are defined
@@ -399,16 +402,17 @@ class MMAX2MarkableLevel(object):
 			for a in self.J_MMAX2ATTRIBUTEPANEL.getAllCurrentAttributes():
 				# type, name, val, branching
 				def_att_list.append((a.getType(), a.getDisplayAttributeName(), a.getDefaultValue(), a.getIsBranching()))
-				def_att_dict[a.getDisplayAttributeName()]=a.getDefaultValue()
+				# lowercased name, default val
+				def_att_dict[a.getLowerCasedAttributeName()]=a.getDefaultValue()
 		return def_att_list, def_att_dict
 
 
 	# Central method for creating markables and adding them to this level
 	# Returns (True, new markable) if newly added, (False, existing markable) otherwise. 
-	# This adds mmax_level automatically to every Markable object
+	# This adds a mmax_level attribute automatically to every Markable object
 	# This is the only method that calls the MMAX2Markable constructor.
-	# No validation is done here, since no attributes are processed
-	def add_markable(self, spanlists, m_id="", allow_overlap=True, allow_duplicate_spans=False, verbose=False):
+	# No validation is done here, since no attributes are processed.
+	def add_markable(self, spanlists, m_id="", allow_overlap=True, allow_duplicate_spans=False, apply_default=False, verbose=False):
 		existing, overlapping 	= None, None
 		empty_span 				= True	# Assume empty span at first
 		# Go over span of new markable
@@ -451,6 +455,10 @@ class MMAX2MarkableLevel(object):
 						self.BASEDATA2MARKABLELISTS[bd].append(new_m)
 					except KeyError:
 						self.BASEDATA2MARKABLELISTS[bd]=[new_m]
+			if apply_default:
+				_,def_atts=self.get_default_attributes()
+				#print(def_atts)
+				new_m.set_attributes(def_atts)
 			return (True, self.MARKABLES[-1])
 		else:
 			print("Not creating markable with empty span on level %s!"%self.NAME, file=sys.stderr)
@@ -469,7 +477,7 @@ class MMAX2MarkableLevel(object):
 	def get_mmax2_java_binding(self):
 		return self.MMAX2_JAVA_BINDING
 
-	# Basedata is required here to correctly expand markable spans
+	# Basedata is required here to correctly expand markable spans (by interpolation)
 	def load_markables(self, markable_path, basedata, multi_val_exceptions, verbose=False):
 		if verbose: print("Loading markables from", markable_path+self.FILE, file=sys.stderr)
 		try:
@@ -491,12 +499,12 @@ class MMAX2MarkableLevel(object):
 					id_from_file=attrs.pop('id')
 					# newly_added is True if new_m has been newly added
 					# Add markable, w/o any attributes yet!
-					# This will fail if the span is empty, 
-					(newly_added, new_m) = self.add_markable(spanlists, m_id=id_from_file, verbose=verbose, allow_overlap=True)
+					# This will fail if the span is empty, or if allow_duplicate_spans=False and a markable with the same span exists already.
+					(newly_added, new_m) = self.add_markable(spanlists, m_id=id_from_file, verbose=verbose, allow_duplicate_spans=False, allow_overlap=True)
 					if newly_added:
 						try:
 							# This is the only point where this exception is raised
-							new_m.set_attributes(attrs)
+							new_m.set_attributes(attrs, verbose=verbose)
 						except InvalidMMAX2AttributeException as exc:
 							# exc contains all the details for each individual exception
 							multi_val_exceptions.add(exc)
@@ -539,7 +547,6 @@ class MMAX2MarkableLevel(object):
 		print("Removing %s markables"%str(len(self.MARKABLES)))
 		self.MARKABLES=list()
 		self.BASEDATA2MARKABLELISTS={}
-
 
 	def delete_markable(self, deletee):
 		# Go over all BD elements that deletee spans
@@ -654,8 +661,6 @@ class MMAX2Project(object):                                       #
 		else:
 			return self.FILE
 
-
-
 class MMAX2Markable(object):
 	# Constructor does not have an attributes parameter. Attributes *must* be set using set_attributes(), which will *always* involve validation.	
 	def __init__(self, spanlists, level, m_id="", verbose=False):
@@ -667,50 +672,36 @@ class MMAX2Markable(object):
 	def get_attributes(self):
 		return self.ATTRIBUTES
 
+	def to_default(self):
+		_,def_atts = self.LEVEL.get_default_attributes()
+		self.set_attributes(def_atts)
+
 	# This will *always* set this markable's attributes, but might raise an InvalidMMAX2AttributesException afterwards. 
-	def set_attributes(self, attrib_dict):
-		validation_errors, valid, extra, supplied = self.LEVEL.validate(attrib_dict)
+	def set_attributes(self, attrib_dict, verbose=False):
+		validation_errors, supplied, valid, invalid, missing = self.LEVEL.validate(attrib_dict)
+		# This makes sure that validation does not modify the supplied attributes
 		assert supplied == attrib_dict
 		# Set, regardless of possible validation errors
 		self.ATTRIBUTES = attrib_dict
+		if verbose:
+			print(self.ATTRIBUTES)
 		if validation_errors:
-			raise InvalidMMAX2AttributeException(self.LEVEL.get_name(), self.ID, valid, extra, supplied)
+			raise InvalidMMAX2AttributeException(self.LEVEL.get_name(), self.ID, supplied, valid, invalid, missing)
 
-#	def get_attributes(self, validated=False):
-#		res = self.ATTRIBS
-#		if validated:
-#			# Validate attributes 
-#			att_panel=self.LEVEL.get_J_MMAX2ATTRIBUTEPANEL()
-#			if att_panel != None:
-#				pass
-#			else:
-#				print("Cannot validate!")
-#		return res
-
-#	def set_all_attributes(self, attribs_to_set, verbose=False):
-#		# Get annotation scheme instance from java, if available
-#		att_panel = self.LEVEL.get_J_MMAX2ATTRIBUTEPANEL()
-#		if att_panel == None:
-#			# Plainly overwrite all attributes w/o annotation scheme checking
-#			self.ATTRIBS=attribs_to_set
-#			return
-
-
-
+	def remove_attribute(self, attname, validate=False):
+		del self.ATTRIBUTES[attname]
+		if validate:
+			# Trigger validation by explicity re-setting attributes
+			self.set_attributes(self.ATTRIBUTES)
 
 	# Delete this markable from its level, also remove it from BASEDATA-Mappings
 	def delete(self):
 		self.LEVEL.delete_markable(self)
 
-
 	def to_xml(self):
-#		print(type(self.ID))
-#		print(type(self.get_span()))
-#		print(type(self.LEVEL.get_name()))
-		
 		st='<markable id="'+self.ID+'" span="'+self.get_span()+'" mmax_level="'+self.LEVEL.get_name()+'"'
 		for (k,v) in self.ATTRIBUTES.items():
-			st=st+' '+k+'="'+v+'"'
+			st=st+' '+str(k)+'="'+str(v)+'"'
 		st=st+'/>\n'
 		return st
 
@@ -719,7 +710,6 @@ class MMAX2Markable(object):
 
 	def get_spanlists(self):
 		return self.SPANLISTS
-
 
 	def matches_all(self,attrs):
 		m=True
@@ -752,19 +742,13 @@ class MMAX2Markable(object):
 	def get_text(self):
 		return self.LEVEL.get_discourse().render_string(self.get_spanlists())[0]
 
-#	def validate_attributes(self):
-#		print(self.ATTRIBS)
-
-
-
 ###############################################################
 class MMAX2CommonPaths(object):                               #
 # Middle-weight class for handling system files and markables #
 # Contains reference to py-discourse object, and loader for   #
 # markable level class
 ###############################################################
-	def __init__(self, file, discourse=None, markablelevels=None, 
-		views=None, args=None, verbose=False):
+	def __init__(self, file, discourse=None, markablelevels=None, views=None, args=None, verbose=False):
 		self.FILE 				= file
 		self.SCHEME_PATH 		= ""
 		self.STYLE_PATH 		= ""
@@ -1413,10 +1397,11 @@ def split_utf8(s, n=1):
 # Exceptions
 # This one is only raised on the level of the individual markable.
 class InvalidMMAX2AttributeException(Exception):
-	def __init__(self, level, m_id, valid_attribs, extra_attribs, supplied_attribs):
+	def __init__(self, level, m_id, supplied_attribs, valid_attribs, extra_attribs, missing_attribs):
+		self.supplied_attribs 	= supplied_attribs
 		self.valid_attribs 		= valid_attribs
 		self.extra_attribs 		= extra_attribs
-		self.supplied_attribs 	= supplied_attribs
+		self.missing_attribs 	= missing_attribs
 		self.m_id 				= m_id
 		self.level 				= level
 		self.message = "\nOne or more of the following attributes are invalid for markable "+self.m_id+" on level "+self.level+"!"
@@ -1425,7 +1410,7 @@ class InvalidMMAX2AttributeException(Exception):
 
 	def __str__(self):
 #		return "\n\nLevel: "+self.level+", ID: "+self.m_id+ "\nSupplied: " + str(self.supplied_attribs)+"\nValid:    "+str(self.valid_attribs)+"\nExtra:    "+str(self.extra_attribs)
-		return '\n\nLevel: '+ self.level+', ID: ' + self.m_id + f'\n{Fore.BLACK}{Style.NORMAL}Supplied: ' + str(self.supplied_attribs)+f'\n{Fore.BLACK}{Back.GREEN}{Style.NORMAL}Valid:    '+str(self.valid_attribs)+f'{Style.RESET_ALL}\n{Fore.YELLOW}{Back.RED}{Style.NORMAL}Extra:    '+str(self.extra_attribs)+f'{Style.RESET_ALL}'
+		return '\n\nLevel: '+ self.level+', ID: ' + self.m_id + f'\n{Fore.BLACK}{Style.NORMAL}Supplied: ' + str(self.supplied_attribs)+f'\n{Fore.BLACK}{Back.GREEN}{Style.NORMAL}Valid:    '+str(self.valid_attribs)+f'{Style.RESET_ALL}\n{Fore.YELLOW}{Back.RED}{Style.NORMAL}Invalid:  '+str(self.extra_attribs)+f'{Style.RESET_ALL}\n{Fore.YELLOW}{Back.RED}{Style.NORMAL}Missing:  '+str(self.missing_attribs)+f'{Style.RESET_ALL}'
 
 class MultipleInvalidMMAX2AttributeExceptions(Exception):
 	def __init__(self):
@@ -1452,103 +1437,3 @@ class MultipleInvalidMMAX2AttributeExceptions(Exception):
 class MaxSizeException(Exception):
 	pass
 
-
-	#	def set_attributes_bak(self, attribs_to_set, verbose=False):
-#		# Get annotation scheme instance from java, if available
-#		sh_inst = self.LEVEL.get_mmax2_scheme_instance()
-#		if sh_inst == None:
-#			# if verbose: print("No java MMAX2_JAVA_BINDING available, using plain hashmap assignment!", file=sys.stderr)
-#			# Plainly overwrite all attributes w/o annotation scheme checking
-#			self.ATTRIBS=attribs_to_set
-#			return
-#
-#		print("To set:", attribs_to_set)
-#
-#		# Store any attributes that might be present before applying attribs_to_set
-#		# These only exist if attributes on existing markable are set
-#		attribs_before 	= 	self.ATTRIBS.copy()
-#		# Collect attribs for assignment here
-#		attribs_after	=	{}
-#
-#		# Get initial attributes with default values first.
-#		# It might be that the markable has non-default values for these already, 
-#		# in which case we just copy them to the new swt of attributes
-#		default_attribs = self.LEVEL.get_default_attributes()
-#		for kd in default_attribs:
-#			k 	= next(iter(kd.keys()))
-#			v 	= kd[k]
-#			# Get attribute. This *must* be present, because it comes from the default.
-#			att = sh_inst.getUniqueAttributeByName(str(k).lower())
-#			if k in attribs_before.keys():
-#				# Default attribute key is present in attribs already, do not overwrite!
-#				# Just copy over
-#				attribs_after[k]=attribs_before[k]
-#				# The current default value might still trigger some dependent attributes
-#				new_atts=att.getNextAttributes(True)
-#				if len(new_atts)>0:
-#					# Add them here to be processed in the current loop
-#					default_attribs.extend(new_atts)
-#					print(new_atts)
-#				continue
-#
-##			if verbose: print("Default:", k, "Before:", att.getSelectedValue())
-#			try:
-#				# Set to desired value
-#				att.setSelectedValue(v,True)
-#			except Exception as ex:
-#				# Exceptions from setting values to freetext attributes are harmless
-#				if att.getType() != FREETEXT:
-#					print(ex, file=sys.stderr)
-#				pass
-#			# att now has the default value
-#			# Collect att-val for later assignment to markable
-#			attribs_after[k]=att.getSelectedValue()
-#			# The current default value might still trigger some dependent attributes
-#			new_atts=att.getNextAttributes(True)
-#			if len(new_atts)>0:
-#				# Add them here to be processed in the current loop
-#				default_attribs.extend(new_atts)
-#				print(new_atts)
-#
-##			if verbose: print("Default:", k, "After:", att.getSelectedValue())
-#
-##		if verbose: print("Attribs after setting default:", attribs_after)
-#
-#		# Collect attributes that might appear as the result of earlier value assignments
-#		dep_atts=[]
-#		# Attributes to set that were used already (for deletion later)
-#		done_atts=[]
-#		# Go over attributes to assign
-#		for k,v in attribs_to_set.items():
-#			# This might fail
-#			att = sh_inst.getUniqueAttributeByName(str(k).lower())
-#			if att!=None:
-#				if verbose: print("Non-Default:", k, "Before:", att.getSelectedValue())			
-#				try:
-#					att.setSelectedValue(v,True)
-#				except Exception as ex:
-#					if att.getType()!=FREETEXT:
-#						print(ex, file=sys.stderr)
-#					pass
-#				# att now has the desired value
-#				# Collect att-val for later assignment to markable
-#				attribs_after[k]=att.getSelectedValue()
-#				# Mark attribute 'k' for deletion
-#				done_atts.append(k.lower())
-##				if verbose: print("Non-Default:", k, "After:", att.getSelectedValue())
-#
-#				dep_atts.extend(att.getNextAttributes(True))
-#			else:
-##				if verbose: print("Attribute", k, "not found!", file=sys.stderr)
-#				pass
-#
-#		# Remove attributes that have been used
-##		print(attribs_to_set)
-#		for i in done_atts:
-#			del attribs_to_set[i]
-##		print("Attribs to set rest", attribs_to_set)
-
-		# Go over all attributes that were added as a result of other attributes being set
-#		for da in dep_atts:
-#			print(da)
-#		self.ATTRIBS=attribs_after
