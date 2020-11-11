@@ -19,6 +19,7 @@ $ pip install .
 If you want to use the JPype-based integration of the MMAX2 annotation scheme business logic (recommended), you need a current MMAX2 version, which can be downloaded from <a href="https://github.com/nlpAThits/MMAX2">here</a>.
 MMAX2 does not require any installation, and comes with all necessary libraries. 
 
+### Loading and Validating MMAX2 datasets
 The following example uses the streamlined version of the ACL Anthology coref dataset (original available <a href="https://www.aclweb.org/anthology/C12-2103/">here</a>) from the <a href="https://github.com/nlpAThits/MMAX2-Showcase">MMAX2-Showcase</a> project. 
 Note that the `--common_paths` parameter is used to supply a **global** common_paths.xml file (not present in the original dataset). This is the recommended practice for large collections of homogeneous MMAX2 datasets, because it renders unnecessary the large number of identical style, scheme, customization, and common_paths files, allowing modifications in one place for the entire collection.
 ```
