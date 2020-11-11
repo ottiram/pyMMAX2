@@ -19,7 +19,7 @@ $ pip install .
 If you want to use the JPype-based integration of the MMAX2 annotation scheme business logic (recommended), you need a current MMAX2 version, which can be downloaded from <a href="https://github.com/nlpAThits/MMAX2">here</a>.
 MMAX2 does not require any installation, and comes with all necessary libraries. 
 
-The following example uses the streamlined version of the ACL Anthology coref dataset (original available <a href="https://www.aclweb.org/anthology/C12-2103/">here</a>) from the <a href="https://github.com/nlpAThits/MMAX2-Showcase">MMAX2-Showcase</a> project. Note that the --common_paths parameter is used to supply a global common_paths.xml file (not present in the original dataset).
+The following example uses the streamlined version of the ACL Anthology coref dataset (original available <a href="https://www.aclweb.org/anthology/C12-2103/">here</a>) from the <a href="https://github.com/nlpAThits/MMAX2-Showcase">MMAX2-Showcase</a> project. Note that the `--common_paths` parameter is used to supply a global common_paths.xml file (not present in the original dataset).
 ```
 $ python load_mmax.py \
    --mmax_file ../MMAX2-Showcase/acl_anthology_coref_coling_2012/C/C02-1016/C02-1016.mmax \
@@ -33,4 +33,4 @@ Markable levels   :
  coref            : 267 markables [default: Annotation scheme instance not available!]
  sentence         : 195 markables [default: Annotation scheme instance not available!]
 ```
-The script just load one .mmax file and prints some project info to the console. Since no --mmax2_libs are specified, 
+The script just loads one .mmax file and prints some project info to the console. Since no MMAX2 libraries are specified using the `--mmax2_libs` parameter, default attributes for the two markable levels **coref** and **sentences** are not available. 
