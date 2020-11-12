@@ -73,4 +73,41 @@ This makes **np_form** a (in MMAX2 parlance) _branching_ attribute, which is vis
 The main purpose of using the Java-based annotation scheme handling in pyMMAX2 is to support **validation**.
 Validation is implemented on the level of individual markables, upon setting a markable's attributes with the `set_attributes()` method. 
 As a general rule, attributes will **always be assigned** to the markable, **regardless of their being valid**. 
-If validation errors are found, an **InvalidMMAX2AttributeException** will be raised. 
+If validation errors are found, an **InvalidMMAX2AttributeException** will be raised. It is the developer's responsibility to handle this exception.
+
+In the example above, validation was performed, but no exceptions were raised. The following example provokes validation errors by using a modified coref_schene.xml (via global_common_paths_with_errors.xml).
+
+```
+$ python load_mmax.py \
+   --mmax_file ../MMAX2-Showcase/acl_anthology_coref_coling_2012/C/C02-1016/C02-1016.mmax \
+   --common_paths ../MMAX2-Showcase/acl_anthology_coref_coling_2012/common_files/global_common_paths_with_errors.xml \
+   --mmax2_libs ../MMAX2/Libs/
+
+Reading <annotation> tags from common paths file ../MMAX2-Showcase/acl_anthology_coref_coling_2012/common_files/global_common_paths_with_errors.xml
+Loading level coref ... 
+   Creating anno scheme
+   Creating markable level
+File header: <?xml version="1.0" encoding="UTF-8"?>
+Loading level sentence ... 
+   Creating anno scheme
+   Creating markable level
+File header: <?xml version="1.0" encoding="UTF-8"?>
+Layer sentence has been set to visible!
+Error: Value ne not found on attribute NP_Form!
+<SNIP>
+Error: Value ne not found on attribute NP_Form!
+53 validation exceptions, e.g.
+Level: coref, ID: markable_168
+Supplied: {'coref_class': 'set_110', 'sure': 'yes', 'np_form': 'ne'}
+Valid:    {'sure': 'yes'}
+Invalid:  {'coref_class': 'set_110', 'np_form': 'ne'}
+Missing:  {}
+
+MMAX2 Project Info:
+-------------------
+.mmax file        : ../MMAX2-Showcase/acl_anthology_coref_coling_2012/C/C02-1016/C02-1016.mmax
+Basedata elements : 4222
+Markable levels   :
+ coref            : 267 markables [default: <>NP_Form:none, Sure:yes]
+ sentence         : 195 markables [default: imported_tag_type:]
+```
