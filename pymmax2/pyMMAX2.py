@@ -1184,8 +1184,10 @@ def kwic_string_for_elements(bd_id_list, basedata, width=5, fillwidth=100, lsep=
 	lc=lc+lsep
 	return lc.rjust(fillwidth)+bd_elem_string+rsep+rc
 
+
+
 # This matches cross-basedata, so it is independent of tokenization
-def match_basedata(regexes, spanlists, ignore_case=False, verbose=False):
+def match_basedata_bak(regexes, spanlists, ignore_case=False, verbose=False):
 	# regexes is a list of (regex, label, sample) tuples, label is optional
 	all_results=[]
 
@@ -1245,93 +1247,6 @@ def match_basedata(regexes, spanlists, ignore_case=False, verbose=False):
 	return all_results
 
 
-# This matches cross-basedata, so it is independent of tokenization
-def match_basedata_bak(regexes, spanlists, basedata, verbose=False, ignore_case=False, teststring=None):
-	# regexes is a list of (regex, label, sample) tuples, label is optional
-	all_results=[]
-
-	testing=False
-	if teststring != None:
-		string=teststring
-		testing=True
-		verbose=True
-
-	if not testing:
-		string, pos2id, pos2word=render_string(spanlists, basedata)
-	else:
-		pos2id={}
-		pos2word={}
-	if ignore_case:
-		string=string.lower()
-
-	# Look at each reg individually
-	for exp in regexes:
-		reg=exp[0]
-		label=reg
-		if len(exp)>1:
-			label=exp[1]
-
-		if testing:
-			print("\n"+reg)
-			print("\n"+string)
-
-		pos=0
-		# Collect lists of span_for_match lists
-		results_for_reg=[]
-
-		for match in re.finditer(reg,string,pos):
-			# None or one capturing group only
-#			group=0 if not match.groups() else 1
-#			if verbose: print(match.span(group))
-			group="m"
-
-			start,end=match.span(group)
-			span_for_match=[]
-
-			if verbose: print("'%s'"%(match), file=sys.stderr)			
-			for t in range(start,end):
-				try:
-					bd_id=pos2id[t]
-				except KeyError:
-					# Skip space
-					continue
-				if len(span_for_match) == 0 or span_for_match[-1]!=bd_id:
-					span_for_match.append(bd_id)
-			if len(span_for_match)>0:
-				results_for_reg.append(([span_for_match],match))
-			pos=end-1
-
-		if len(results_for_reg)>0:
-			all_results.append((results_for_reg,reg,label))
-	return all_results
-
-
-
-def compose_string_bak(spanlists, basedata, brackets=False, mapping=True):
-	m_string=""
-	pos2id,pos2word={},{}
-	last_pos=0
-	for spanlist in spanlists:
-		for sid, bd_id in enumerate(spanlist):
-			te=basedata.get_element_text(bd_id)
-			atts=basedata.get_element_attributes(bd_id)
-			# Default 1 is correct because one space is the default
-			l_spaces=int(atts.get('spc','1'))
-			# Create pad
-			pad=" "*l_spaces
-			last_pos=len(m_string)+l_spaces
-			# Add spaces *before* te
-			m_string=m_string+pad+te
-			if mapping:
-				# Create mapping of char positions covered by te to bd_id
-				for i in range(last_pos, last_pos+len(te)):
-					pos2id[i]=bd_id
-					pos2word[i]=te
-
-		m_string="["+m_string+"]" if brackets else m_string
-	return m_string, pos2id, pos2word
-
-
 # spanlists is a list with one list per segment
 def spanlists_to_span(spanlists):
 	span=""
@@ -1368,8 +1283,8 @@ def overlap(span1, span2, basedata):
 def flatten_spanlists(spanlists):
 	return [item for sublist in spanlists for item in sublist]
 
-def pythonify_MMAX2Attribute(mmax2att):
-	print(mmax2att.getDisplayAttributeName())
+#def pythonify_MMAX2Attribute(mmax2att):
+#	print(mmax2att.getDisplayAttributeName())
 
 
 def int2bytes(i):
@@ -1436,4 +1351,3 @@ class MultipleInvalidMMAX2AttributeExceptions(Exception):
 
 class MaxSizeException(Exception):
 	pass
-
