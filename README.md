@@ -38,14 +38,15 @@ Markable levels   :
 The script just loads one .mmax file and prints some project info to the console. Since no MMAX2 libraries base folder is specified using the `--mmax2_libs` parameter, default attributes for the two markable levels **coref** and **sentences** are not available. 
 
 Compare the above to the behaviour of the following command, which *does* specify the MMAX2 libraries base folder, causing Java-based annotation scheme handling to be executed in the background. 
-The effects are two-fold: 
+The effects are three-fold: 
 First, info messages from the Java code are printed to the console.
 Second, default attributes for both markable levels are determined from the annotation scheme xml files (as specified in global_common_paths.xml), and displayed with the project info.
+Third, two validation exceptions are raised.
 
 ```
-$ python load_mmax.py \
+python load_mmax.py \
    --mmax_file ../MMAX2-Showcase/acl_anthology_coref_coling_2012/C/C02-1016/C02-1016.mmax \
-   --common_paths ../MMAX2-Showcase/acl_anthology_coref_coling_2012/common_files/global_common_paths.xml \
+   --common_paths ../MMAX2-Showcase/acl_anthology_coref_coling_2012/common_files/global_common_paths.xml \ 
    --mmax2_libs ../MMAX2/Libs/
 
 Reading <annotation> tags from common paths file ../MMAX2-Showcase/acl_anthology_coref_coling_2012/common_files/global_common_paths.xml
@@ -58,6 +59,12 @@ Loading level sentence ...
    Creating markable level
 File header: <?xml version="1.0" encoding="UTF-8"?>
 Layer sentence has been set to visible!
+2 validation exceptions, e.g.
+Level: coref, ID: markable_313
+Supplied: {'coref_class': 'set_141', 'sure': 'yes', 'np_form': 'none'}
+Valid:    {'np_form': 'none', 'sure': 'yes'}
+Invalid:  {'coref_class': 'set_141'}
+Missing:  {}
 
 MMAX2 Project Info:
 -------------------
@@ -69,13 +76,16 @@ Markable levels   :
 ```
 Note that the coref_scheme.xml in the <a href="https://github.com/nlpAThits/MMAX2-Showcase">MMAX2-Showcase</a> version of the ACL Anthology dataset has been modified compared to the original scheme file, by making the **coref_class** attribute *dependent* on the **np_form** attribute having a non-default value.
 This makes **np_form** a (in MMAX2 parlance) _branching_ attribute, which is visible in the `<>` prefix to the **np_form** attribute name above.
+As a result, the 'coref_class' is treated as invalid in two cases where **np_form=none**, because, according to the annotation scheme for the coref level, the **coref_class** attribute is only valid/accessible if the **np_form** attribute has a value different from 'none'.
+
 
 The main purpose of using the Java-based annotation scheme handling in pyMMAX2 is to support **validation**.
 Validation is implemented on the level of individual markables, upon setting a markable's attributes with the `set_attributes()` method. 
 As a general rule, attributes will **always be assigned** to the markable, **regardless of their being valid**. 
 If validation errors are found, an **InvalidMMAX2AttributeException** will be raised. It is the developer's responsibility to handle this exception.
 
-In the example above, validation was performed, but no exceptions were raised. The following example provokes validation errors by using a modified coref_schene.xml (via global_common_paths_with_errors.xml).
+In the example above, validation was performed, but only a few exceptions were raised (which, however, seem to indicate actual errors in the dataset.)
+The following example provokes some more validation errors by using a modified coref_schene.xml (via global_common_paths_with_errors.xml).
 
 ```
 $ python load_mmax.py \
@@ -117,6 +127,7 @@ The error in the coref_scheme.xml used above consists of changing the allowed va
 As a result, loading markables with the (now invalid) 'ne' value will raise a validation exception on every markable with 'np_form=ne'.
 Single exceptions are collected during bulk markable loading, and another exception is raised at the end.
 The above output is the result of handling this exception. 
-Note that both 'np_form=ne' and 'coref_class=set_110' are treated as invalid, because, according to the annotation scheme for the coref level, the latter attribute is only valid/accessible if the former has a valid value.
 
 ### Access to MMAX2 Data
+
+tbc
