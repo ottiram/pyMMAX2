@@ -32,15 +32,3 @@ for f in files:
 		print('%s validation exceptions, e.g.\n%s'%(str(mive.get_exception_count()),
 			                             str(mive.get_exception_at(0)).strip()))
 	pd.info()
-
-#print("\n\n\n")
-#(n,m) = pd.get_markable_level_by_name("coref").add_markable([['word_1']], allow_duplicate_spans=True)
-#print("1",m.to_xml())
-#m.to_default()
-#print("2",m.to_xml())
-#m.remove_attribute('np_form',validate=True)
-#try:
-#	m.set_attributes({'np_form':'none'})
-#except InvalidMMAX2AttributeException as ive:
-##	print(ive)
-#print("3",m.to_xml())
