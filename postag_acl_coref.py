@@ -1,5 +1,5 @@
 from pymmax2.pyMMAX2 import *
-import jpype, sys, argparse
+import jpype, sys, argparse, nltk
 from glob import glob
 
 parser = argparse.ArgumentParser()
@@ -31,4 +31,9 @@ for f in files:
 	except MultipleInvalidMMAX2AttributeExceptions as mive:
 		print('%s validation exceptions, e.g.\n%s'%(str(mive.get_exception_count()),
 			                             str(mive.get_exception_at(0)).strip()))
-	pd.info()
+	for sent_m in pd.get_markablelevel_by_name("sentence").get_all_markables():
+		# render_string() returns a tuple of string, word list, id list, and (optionally) stringpos-to-id mapping
+		_, plain_words, word_ids, _ = sent_m.render_string(mapping=False)
+		# Get list of (word,pos) tuples 
+		tagged_words = list(zip(nltk.pos_tag(plain_words),word_ids))
+		print(tagged_words)

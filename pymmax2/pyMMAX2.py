@@ -138,7 +138,7 @@ class MMAX2Discourse(object):                       #
 					def_att_string="none defined"
 			print(" "+i.get_name().ljust(16)+" : "+f'{Fore.BLUE}'+str(len(i.get_all_markables()))+f'{Style.RESET_ALL}'+" markables [default: "+f'{Fore.BLUE}'+def_att_string+f'{Style.RESET_ALL}]')
 
-	def get_markable_level_by_name(self, name, verbose=False):
+	def get_markablelevel_by_name(self, name, verbose=False):
 		r=None
 		for i in self.COMMONPATHS.MARKABLELEVELS:
 			if i.get_name()==name:
@@ -148,7 +148,6 @@ class MMAX2Discourse(object):                       #
 		if r == None:
 			print("Level %s not found."%name, file=sys.stderr)
 		return r
-
 
 
 	# This matches cross-basedata, so it is independent of tokenization
@@ -196,7 +195,7 @@ class MMAX2Discourse(object):                       #
 		return all_results
 
 
-	def add_markable_level(self, name, namespace="", scheme="", customization="", create_if_missing=False, encoding='utf-8', dtd_path='"markables.dtd"'):
+	def add_markablelevel(self, name, namespace="", scheme="", customization="", create_if_missing=False, encoding='utf-8', dtd_path='"markables.dtd"'):
 		ml = MMAX2MarkableLevel(name,
 							self,
 							namespace=namespace, 
@@ -205,8 +204,12 @@ class MMAX2Discourse(object):                       #
 							create_if_missing=create_if_missing, 
 							dtd_path=dtd_path,
 							encoding=encoding)
-		self.COMMONPATHS.append_markable_level(ml)
+		self.COMMONPATHS.append_markablelevel(ml)
 		return ml
+
+
+	def render_string(self, brackets=False, mapping=False):
+		return (self.get_basedata().render_string(for_ids=None, brackets=brackets, mapping=mapping))
 
 
 	def get_basedata(self, bd_type="words"):
@@ -278,7 +281,7 @@ class MMAX2Discourse(object):                       #
 	def match(self, bd_type="", regexes=[], on_levels=[], attrs_to_match={}, ignore_case=False, verbose=False, teststring=None):
 		r=[]
 		for l_name in on_levels:
-			level=self.get_markable_level_by_name(l_name)
+			level=self.get_markablelevel_by_name(l_name)
 			for markable in level.get_all_markables():
 				if markable.matches_all(attrs_to_match):
 					tr=match_basedata(regexes, markable.get_spanlists(), self.get_basedata(bd_type=bd_type), ignore_case=ignore_case, verbose=verbose, teststring=teststring)
@@ -424,10 +427,13 @@ class MMAX2MarkableLevel(object):
 				# Go over all existing markables (if any)
 				for m in self.BASEDATA2MARKABLELISTS.get(bd,[]):
 					# Check for identity, which is illegal (on the same level!!) if allow_duplicate_spans == False
-					if not allow_duplicate_spans and m.get_span() == spanlists_to_span(spanlists) :# and m.get_attributes() == attribs:
+					#if not allow_duplicate_spans and m.get_span() == spanlists_to_span(spanlists) :# and m.get_attributes() == attribs:
+					if not allow_duplicate_spans and m.get_spanlists() == spanlists :# and m.get_attributes() == attribs:
 						existing=m
 						break
-					if not allow_overlap and overlap(m.get_span(),spanlists_to_span(spanlists),self.get_discourse().get_basedata() ):
+					#if not allow_overlap and      overlap(m.get_span(),      spanlists_to_span(spanlists),self.get_discourse().get_basedata() ):
+					#if not allow_overlap and span_overlap(m.get_spanlists(), spanlists, self.get_discourse().get_basedata() ):
+					if not allow_overlap and span_overlap(m.get_spanlists(), spanlists):
 						overlapping=m
 						break
 				if existing or overlapping:
@@ -478,7 +484,7 @@ class MMAX2MarkableLevel(object):
 		return self.MMAX2_JAVA_BINDING
 
 	# Basedata is required here to correctly expand markable spans (by interpolation)
-	def load_markables(self, markable_path, basedata, multi_val_exceptions, verbose=False):
+	def load_markables(self, markable_path, basedata, multi_val_exceptions, allow_duplicate_spans=False, verbose=False):
 		if verbose: print("Loading markables from", markable_path+self.FILE, file=sys.stderr)
 		try:
 			with open(markable_path+self.FILE,'r') as ma_in:
@@ -493,14 +499,15 @@ class MMAX2MarkableLevel(object):
 					# This is a meta attribute not stored in the attributes dict
 					#del attrs['mmax_level']
 					attrs.pop('mmax_level')
-					# Dito
+					# Dito.
+					# Expand short span from xml file *once*, and assign at markable creation
 					spanlists=span_to_spanlists(attrs.pop('span'),basedata)
 					# Make sure to add the markable from file with the same id, such that pointers are not broken
 					id_from_file=attrs.pop('id')
 					# newly_added is True if new_m has been newly added
 					# Add markable, w/o any attributes yet!
 					# This will fail if the span is empty, or if allow_duplicate_spans=False and a markable with the same span exists already.
-					(newly_added, new_m) = self.add_markable(spanlists, m_id=id_from_file, verbose=verbose, allow_duplicate_spans=False, allow_overlap=True)
+					(newly_added, new_m) = self.add_markable(spanlists, m_id=id_from_file, verbose=verbose, allow_duplicate_spans=allow_duplicate_spans, allow_overlap=True)
 					if newly_added:
 						try:
 							# This is the only point where this exception is raised
@@ -665,6 +672,7 @@ class MMAX2Markable(object):
 	# Constructor does not have an attributes parameter. Attributes *must* be set using set_attributes(), which will *always* involve validation.	
 	def __init__(self, spanlists, level, m_id="", verbose=False):
 		self.LEVEL 		= level 		# This might contain a connection to the underlying MMAX2AnnotationScheme instance 
+		# SPANLISTS is a list of lists, where each inner list represents one contiguous sequence of basedata elements.
 		self.SPANLISTS 	= spanlists
 		self.ID 		= m_id
 		self.ATTRIBUTES = {}
@@ -699,14 +707,18 @@ class MMAX2Markable(object):
 		self.LEVEL.delete_markable(self)
 
 	def to_xml(self):
-		st='<markable id="'+self.ID+'" span="'+self.get_span()+'" mmax_level="'+self.LEVEL.get_name()+'"'
+		st='<markable id="'+self.ID+'" span="'+spanlists_to_span(self.SPANLISTS)+'" mmax_level="'+self.LEVEL.get_name()+'"'
 		for (k,v) in self.ATTRIBUTES.items():
 			st=st+' '+str(k)+'="'+str(v)+'"'
 		st=st+'/>\n'
 		return st
 
-	def get_span(self):
-		return spanlists_to_span(self.SPANLISTS)
+	def render_string(self, brackets=False, mapping=False):
+		return (self.LEVEL.get_discourse().get_basedata().render_string(for_ids=self.SPANLISTS, brackets=brackets, mapping=mapping))
+
+	# This should not be necessary, use spanlists_to_span directly
+#	def get_span(self):
+#		return spanlists_to_span(self.SPANLISTS)
 
 	def get_spanlists(self):
 		return self.SPANLISTS
@@ -739,8 +751,8 @@ class MMAX2Markable(object):
 	def get_id(self):
 		return self.ID
 
-	def get_text(self):
-		return self.LEVEL.get_discourse().render_string(self.get_spanlists())[0]
+#	def get_text(self):
+#		return self.LEVEL.get_discourse().render_string(self.get_spanlists())[0]
 
 ###############################################################
 class MMAX2CommonPaths(object):                               #
@@ -806,7 +818,7 @@ class MMAX2CommonPaths(object):                               #
 					print(f'\t{Back.RED}{Fore.BLACK}{Style.BRIGHT}FAILURE{Style.RESET_ALL}', file=sys.stderr)
 			ml.load_markables(mmax2proj.get_mmax2_path()+self.MARKABLE_PATH, mmax2proj.get_basedata(bdtype="words"), multi_val_exceptions, verbose=verbose)
 
-	def append_markable_level(self, ml):
+	def append_markablelevel(self, ml):
 		self.MARKABLELEVELS.append(ml)
 
 	def write(self, overwrite=False):
@@ -814,11 +826,11 @@ class MMAX2CommonPaths(object):                               #
 			with open(self.FILE, mode="w") as bout:
 				bout.write('<?xml version="1.0"?>\n')
 				bout.write("<common_paths>\n")
-				bout.write("<scheme_path>"+self.SCHEME_PATH+"</scheme_path>\n")
-				bout.write("<style_path>"+self.STYLE_PATH+"</style_path>\n")			
-				bout.write("<basedata_path>"+self.BASEDATA_PATH+"</basedata_path>\n")
-				bout.write("<customization_path>"+self.CUSTOMIZATION_PATH+"</customization_path>\n")			
-				bout.write("<markable_path>"+self.MARKABLE_PATH+"</markable_path>\n")			
+				bout.write("<scheme_path>"			+self.SCHEME_PATH+"</scheme_path>\n")
+				bout.write("<style_path>"			+self.STYLE_PATH+"</style_path>\n")			
+				bout.write("<basedata_path>"		+self.BASEDATA_PATH+"</basedata_path>\n")
+				bout.write("<customization_path>"	+self.CUSTOMIZATION_PATH+"</customization_path>\n")			
+				bout.write("<markable_path>"		+self.MARKABLE_PATH+"</markable_path>\n")			
 				bout.write("<views>\n")
 				for n in self.VIEWS:
 					bout.write("<stylesheet>"+n+"</stylesheet>\n")
@@ -957,10 +969,15 @@ class Basedata(object):
 		m_string=""
 		pos2id={}
 		last_pos=0
-#		basedata=self.get_basedata()
 		words=[]
-#		if not for_ids:
-#			for_ids=[self.]
+		ids=[]
+		if not for_ids:
+			for_ids=[[]]
+			# dcelement = tuple of (string, id, discpos, attribs)
+#			print(self.DCELEMENTS)
+			for _, bdid, _, _ in self.DCELEMENTS:
+				for_ids[0].append(bdid)
+
 		for spanlist in for_ids:
 			for sid, bd_id in enumerate(spanlist):
 				te=self.get_element_text(bd_id)
@@ -979,10 +996,10 @@ class Basedata(object):
 					# Create mapping of char positions covered by te to bd_id
 					for i in range(last_pos, last_pos+len(te)):
 						pos2id[i]=bd_id
-						# pos2word[i]=te
 				words.append(te)
+				ids.append(bd_id)
 			m_string="["+m_string+"]" if brackets else m_string
-		return m_string, words, pos2id
+		return m_string, words, ids, pos2id
 
 
 	# Returns bd_id
@@ -998,7 +1015,7 @@ class Basedata(object):
 	def match_string(self, regexes, for_ids=None, ignore_case=False, verbose=False):
 		# regexes is a list of (regex, label) tuples, where label is optional
 		all_results=[]
-		string, words, pos2id=self.render_string(for_ids=for_ids, mapping=True)
+		string, words, _, pos2id=self.render_string(for_ids=for_ids, mapping=True)
 		if ignore_case:
 			string=string.lower()
 
@@ -1248,6 +1265,7 @@ def match_basedata_bak(regexes, spanlists, ignore_case=False, verbose=False):
 
 
 # spanlists is a list with one list per segment
+# This should only be necessary when serializing a markable to xml
 def spanlists_to_span(spanlists):
 	span=""
 	for spanlist in spanlists:
@@ -1272,9 +1290,9 @@ def span_to_spanlists(span, basedata):
 	return spanlists
 
 
-def overlap(span1, span2, basedata):
-	full_span1=span_to_spanlists(span1, basedata)
-	full_span2=span_to_spanlists(span2, basedata)
+def span_overlap(full_span1, full_span2):
+#	full_span1=span_to_spanlists(span1, basedata)
+#	full_span2=span_to_spanlists(span2, basedata)
 
 	if set(flatten_spanlists(full_span1)).intersection(set(flatten_spanlists(full_span2))) != {}:
 		return True
@@ -1287,28 +1305,29 @@ def flatten_spanlists(spanlists):
 #	print(mmax2att.getDisplayAttributeName())
 
 
-def int2bytes(i):
-    hex_string = '%x' % i
-    n = len(hex_string)
-    return binascii.unhexlify(hex_string.zfill(n + (n & 1)))
+#def int2bytes(i):
+#    hex_string = '%x' % i
+#    n = len(hex_string)
+#    return binascii.unhexlify(hex_string.zfill(n + (n & 1)))
 
-def split_utf8(s, n=1):
-#	print(type(s))
-	start = 0
-	lens = len(s)
-	print(lens)
-	while start < lens:
-		if lens - start <= n:
-			yield s[start:]
-			return # StopIteration
-		end = start + n
+#def split_utf8(s, n=1):
+##	print(type(s))#
+#	start = 0
+#	lens = len(s)
+#	print(lens)
+#	while start < lens:
+#		if lens - start <= n:
+#			yield s[start:]
+#			return # StopIteration
+#		end = start + n
 #		print(2,type(s[end]), type(0x80))
-		while 0x80 <= s[end] <= 0xBF:
-			end -= 1
+#		while 0x80 <= s[end] <= 0xBF:
+#			end -= 1
 #		assert end > start
-		yield s[start:end]
-		start = end
+#		yield s[start:end]
+#		start = end
 
+#######################################
 # Exceptions
 # This one is only raised on the level of the individual markable.
 class InvalidMMAX2AttributeException(Exception):
@@ -1324,8 +1343,8 @@ class InvalidMMAX2AttributeException(Exception):
 		super().__init__(self.message)
 
 	def __str__(self):
-#		return "\n\nLevel: "+self.level+", ID: "+self.m_id+ "\nSupplied: " + str(self.supplied_attribs)+"\nValid:    "+str(self.valid_attribs)+"\nExtra:    "+str(self.extra_attribs)
 		return '\n\nLevel: '+ self.level+', ID: ' + self.m_id + f'\n{Fore.BLACK}{Style.NORMAL}Supplied: ' + str(self.supplied_attribs)+f'\n{Fore.BLACK}{Back.GREEN}{Style.NORMAL}Valid:    '+str(self.valid_attribs)+f'{Style.RESET_ALL}\n{Fore.YELLOW}{Back.RED}{Style.NORMAL}Invalid:  '+str(self.extra_attribs)+f'{Style.RESET_ALL}\n{Fore.YELLOW}{Back.RED}{Style.NORMAL}Missing:  '+str(self.missing_attribs)+f'{Style.RESET_ALL}'
+
 
 class MultipleInvalidMMAX2AttributeExceptions(Exception):
 	def __init__(self):
