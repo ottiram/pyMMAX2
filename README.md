@@ -70,4 +70,7 @@ Markable levels   :
 Note that the coref_scheme.xml in the <a href="https://github.com/nlpAThits/MMAX2-Showcase">MMAX2-Showcase</a> version of the ACL Anthology dataset has been modified compared to the original scheme file, by making the **coref_class** attribute *dependent* on the **np_form** attribute having a non-default value.
 This makes **np_form** a (in MMAX2 parlance) _branching_ attribute, which is visible in the `<>` prefix to the **np_form** attribute name above.
 
-The main purpose of using the Java-based annotation scheme handling in pyMMAX2 is to support validation.
+The main purpose of using the Java-based annotation scheme handling in pyMMAX2 is to support **validation**.
+Validation is implemented on the level of individual markables, upon setting a markable's attributes with the `set_attributes()` method. 
+As a general rule, attributes will **always be assigned** to the markable, **regardless of their being valid**. 
+If validation errors are found, an **InvalidMMAX2AttributeException** will be raised. 
