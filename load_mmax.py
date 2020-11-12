@@ -27,9 +27,9 @@ else:
 for f in files:
 	pd = MMAX2Discourse(f, common_paths=args.common_paths, mmax2_java_binding=jpype if jpype.isJVMStarted() else None)
 	try:
-		pd.load_markables(verbose=True)
+		pd.load_markables(verbose=False)
 	except MultipleInvalidMMAX2AttributeExceptions as mive:
-		print('%s exceptions, e.g.\n%s'%(str(mive.get_exception_count()),
+		print('%s validation exceptions, e.g.\n%s'%(str(mive.get_exception_count()),
 			                             str(mive.get_exception_at(0)).strip()))
 	pd.info()
 
