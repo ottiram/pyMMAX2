@@ -117,4 +117,4 @@ The error in the coref_scheme.xml used above consists of changing the allowed va
 As a result, loading markables with the (now invalid) 'ne' value will raise a validation exception on every markable with 'np_form=ne'.
 Single exceptions are collected during bulk markable loading, and another exception is raised at the end.
 The above output is the result of handling this exception. 
-Note that both 'np_form=ne' and 'coref_class=set_110' are treated as invalid, because the latter attribute is only valid if the former has a valid value.
+Note that both 'np_form=ne' and 'coref_class=set_110' are treated as invalid, because, according to the annotation scheme for the coref level, the latter attribute is only valid/accessible if the former has a valid value.
