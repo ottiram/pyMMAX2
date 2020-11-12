@@ -17,7 +17,7 @@ $ pip install .
 ```
 
 If you want to use the JPype-based integration of the MMAX2 annotation scheme business logic (recommended), you need a current MMAX2 version, which can be downloaded from <a href="https://github.com/nlpAThits/MMAX2">here</a>.
-MMAX2 does not require any installation, and comes with all necessary libraries. 
+MMAX2 itself does not require any installation, and comes with all necessary libraries. 
 
 ### Loading and Validating MMAX2 datasets
 The following example uses the streamlined version of the ACL Anthology coref dataset (original available <a href="https://www.aclweb.org/anthology/C12-2103/">here</a>) from the <a href="https://github.com/nlpAThits/MMAX2-Showcase">MMAX2-Showcase</a> project. 
@@ -94,7 +94,9 @@ Loading level sentence ...
 File header: <?xml version="1.0" encoding="UTF-8"?>
 Layer sentence has been set to visible!
 Error: Value ne not found on attribute NP_Form!
+
 <SNIP>
+
 Error: Value ne not found on attribute NP_Form!
 53 validation exceptions, e.g.
 Level: coref, ID: markable_168
@@ -111,3 +113,8 @@ Markable levels   :
  coref            : 267 markables [default: <>NP_Form:none, Sure:yes]
  sentence         : 195 markables [default: imported_tag_type:]
 ```
+The error in the coref_scheme.xml used above consists of changing the allowed value 'ne' for the np_form attribute to 'none'. 
+As a result, loading markables with the (now invalid) 'ne' value will raise a validation exception on every markable with 'np_form=ne'.
+Single exceptions are collected during bulk markable loading, and another exception is raised at the end.
+The above output is the result of handling this exception. 
+Note that both 'np_form=ne' and 'coref_class=set_110' are treated as invalid, because the latter attribute is only valid if the former has a valid value.
