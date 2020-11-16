@@ -133,7 +133,7 @@ One of the motivations for creating pyMMAX2 was to allow for an easier integrati
 In the following, **NLTK** is used to add a POS level to an existing collection of annotation projects, again from the ACL Anthology dataset.
 
 Adding a new level without a pre-existing annotation scheme to an existing MMAX2 project is one of the use cases that can be solved without annotation scheme evaluation, which is why the following example is called without the `--mmax2_libs` parameter.
-The following will add a markable level called 'pos' to all MMAX2 projects in the /C/ subfolder of the ACl Anthology dataset
+The following will add a markable level called 'pos' to all MMAX2 projects in the /C/ subfolder of the ACl Anthology dataset.
 
 ```
 $ python postag_acl_coref.py \
@@ -173,3 +173,4 @@ Level file name set to C02-1002_pos_level.xml
 Markables at ../MMAX2-Showcase/acl_anthology_coref_coling_2012/C/C02-1002/./Markables/C02-1002_pos_level.xml not found, skipping!
 Writing to ../MMAX2-Showcase/acl_anthology_coref_coling_2012/C/C02-1002/./Markables/C02-1002_pos_level.xml
 ```
+Note that in the above, after processing the first MMAX2 project found in the folder, the global_common_paths.xml file is saved, effectively adding the new markable level to **all** MMAX2 projects in the scope of that file.
