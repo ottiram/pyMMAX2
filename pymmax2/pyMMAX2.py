@@ -1,4 +1,4 @@
-import sys, os, codecs, ntpath, pkg_resources, colorama, binascii
+import sys, os, codecs, ntpath, pkg_resources, colorama, binascii, time
 
 from bs4 import BeautifulSoup as bs
 from bs4.dammit import EncodingDetector
@@ -116,6 +116,9 @@ class MMAX2Discourse(object):                       #
 	def get_mmax2_java_binding(self):
 		return self.MMAX2_JAVA_BINDING
 
+	def get_mmax2_project(self):
+		return self.MMAX2_PROJECT
+
 	def info(self):
 		print("\nMMAX2 Project Info:")
 		print("-------------------")
@@ -195,22 +198,24 @@ class MMAX2Discourse(object):                       #
 		return all_results
 
 
-	def add_markablelevel(self, name, namespace="", scheme="", customization="", create_if_missing=False, encoding='utf-8', dtd_path='"markables.dtd"'):
-		ml = MMAX2MarkableLevel(name,
-							self,
-							namespace=namespace, 
-							scheme=scheme, 
-							customization=customization, 
-							create_if_missing=create_if_missing, 
-							dtd_path=dtd_path,
-							encoding=encoding)
-		self.COMMONPATHS.append_markablelevel(ml)
-		return ml
-
+	def add_markablelevel(self, name, namespace=None, scheme="", customization="", create_if_missing=False, encoding='utf-8', dtd_path='"markables.dtd"', at_startup="active"):
+		if self.get_markablelevel_by_name(name)==None:
+			ml = MMAX2MarkableLevel(name,
+								self,
+								namespace=namespace, 
+								scheme=scheme, 
+								customization=customization, 
+								create_if_missing=create_if_missing, 
+								dtd_path=dtd_path,
+								encoding=encoding,
+								at_startup=at_startup)
+			self.COMMONPATHS.append_markablelevel(ml)
+			return ml
+		else:
+			raise MarkableLevelExistsException(name)
 
 	def render_string(self, brackets=False, mapping=False):
 		return (self.get_basedata().render_string(for_ids=None, brackets=brackets, mapping=mapping))
-
 
 	def get_basedata(self, bd_type="words"):
 		return self.MMAX2_PROJECT.get_basedata(bd_type)
@@ -252,7 +257,7 @@ class MMAX2Discourse(object):                       #
 			else:
 				if verbose: print(word)
 				try:				mwe_tf_dict[word] += 1    
-				except KeyError:	mwe_tf_dict[word] = 1
+				except KeyError:	mwe_tf_dict[word]  = 1
 
 		if sort != "":
 			if sort ==    "alpha_asc":
@@ -301,8 +306,8 @@ class MMAX2Discourse(object):                       #
 class MMAX2MarkableLevel(object):
 #################################
 	def __init__ (self, name, discourse, 
-					file="", namespace="", scheme="", customization="", 
-					create_if_missing=False, encoding='utf-8', dtd_path='"markables.dtd"', 
+					file="", namespace=None, scheme="", customization="", 
+					create_if_missing=False, encoding='utf-8', dtd_path='"markables.dtd"', at_startup="active",
 					verbose=False): 
 		if verbose: print("Creating markable level", name, file=sys.stderr)
 		self.NAME 					= name
@@ -316,13 +321,59 @@ class MMAX2MarkableLevel(object):
 		self.DTD_PATH 				= dtd_path
 		self.DISCOURSE 				= discourse
 		self.J_MMAX2ATTRIBUTEPANEL	= None
+		self.FILENAME_IS_EXPANDED 	= False
+		self.AT_STARTUP 			= at_startup
 
 		if self.DISCOURSE.get_J_MMAX2DISCOURSE()!=None:
+			# This only means that connections to schemes exist, but this specific level might not exist yet!
 			if verbose: print("Getting reference to native Java MMAX2MarkableLevel "+self.NAME+" ", file=sys.stderr)
+			# This will fail if a new level is being created
 			tmp_lev=self.DISCOURSE.get_J_MMAX2DISCOURSE().getMarkableLevelByName(self.NAME,False)
 			if verbose: print(f'{Fore.MAGENTA}{Style.BRIGHT}'+str(tmp_lev)+f'{Style.RESET_ALL}', file=sys.stderr)
 			self.J_MMAX2ATTRIBUTEPANEL = tmp_lev.getCurrentAnnotationScheme().getCurrentAttributePanel()
 			self.J_MMAX2ATTRIBUTEPANEL.setAttributePanelContainer(self.DISCOURSE.get_mmax2_java_binding().JClass('org.eml.MMAX2.gui.windows.MMAX2AttributePanelContainer')())
+
+	def set_at_startup(self, mode):
+		self.AT_STARTUP=mode
+
+	def get_at_startup(self):
+		return self.AT_STARTUP
+
+	def set_filename_is_expanded(self):
+		self.FILENAME_IS_EXPANDED=True
+
+	def get_filename_is_expanded(self):
+		return self.FILENAME_IS_EXPANDED
+
+	def write(self, to_path="", overwrite=False):
+		if to_path=="":
+			as_file=self.FILE
+		else:
+			as_file=to_path+os.path.basename(self.FILE)
+
+		if os.path.exists(as_file) and not overwrite:
+			print("File exists and overwrite is FALSE!\n\t",as_file)
+			return
+		if os.path.exists(as_file):
+			# Rename to backup instead of overwriting
+			bak_name=as_file+"."+str(int(time.time()*1000.0))
+			print("File exists, creating backup "+bak_name)
+			try:
+				os.rename(as_file,bak_name)
+			except Exception as ex:
+				print("Could not create backup!",ex)
+
+		print("Writing to",as_file)
+
+		with codecs.open(as_file, mode="w", encoding=self.ENCODING) as bout:
+			bout.write('<?xml version="1.0" encoding="'+self.ENCODING.upper()+'"?>\n')
+			bout.write('<!DOCTYPE markables SYSTEM '+self.DTD_PATH+'>\n')
+			bout.write("<markables "+str(self.NAMESPACE)+">\n")
+
+			for m in self.MARKABLES:
+				bout.write(m.to_xml())
+			bout.write('</markables>\n')
+
 
 	def get_J_MMAX2ATTRIBUTEPANEL(self):
 		return self.J_MMAX2ATTRIBUTEPANEL
@@ -474,11 +525,12 @@ class MMAX2MarkableLevel(object):
 	def get_discourse(self):
 		return self.DISCOURSE
 
-	def get_file_name(self):
-		return self.FILE
-
-	def set_file_name(self, new_name):
+	def set_filename(self, new_name):
 		self.FILE = new_name
+		print("Level file name set to",new_name)
+
+	def get_filename(self):
+		return self.FILE
 
 	def get_mmax2_java_binding(self):
 		return self.MMAX2_JAVA_BINDING
@@ -517,7 +569,7 @@ class MMAX2MarkableLevel(object):
 							multi_val_exceptions.add(exc)
 			if verbose: print("\tLoaded",len(self.MARKABLES),"markables to level",self.NAME, file=sys.stderr)		
 		except FileNotFoundError:
-			print("Markables at "+markable_path +" not found, skipping!", file=sys.stderr)
+			print("Markables at "+markable_path+self.FILE +" not found, skipping!", file=sys.stderr)
 
 
 	def get_name(self):
@@ -529,8 +581,6 @@ class MMAX2MarkableLevel(object):
 	def get_customization(self):
 		return self.CUSTOMIZATION
 
-	def get_file_name(self):
-		return self.FILE
 
 	def get_markables_for_basedata(self, bdid):
 		try:
@@ -564,26 +614,6 @@ class MMAX2MarkableLevel(object):
 				pass
 		self.MARKABLES.remove(deletee)
 
-
-	def write(self, to_path="", overwrite=False):
-		if to_path=="":
-			as_file=self.FILE
-		else:
-			as_file=to_path+os.path.basename(self.FILE)
-
-		if os.path.exists(as_file) and not overwrite:
-			print("File exists and overwrite is FALSE!\n\t",as_file)
-			return
-
-		with codecs.open(as_file, mode="w", encoding=self.ENCODING) as bout:
-			bout.write('<?xml version="1.0" encoding="'+self.ENCODING.upper()+'"?>\n')
-			bout.write('<!DOCTYPE markables SYSTEM '+self.DTD_PATH+'>\n')
-			bout.write("<markables "+self.NAMESPACE+">\n")
-
-			for m in self.MARKABLES:
-				bout.write(m.to_xml())
-			bout.write('</markables>\n')
-
 	def get_markables_by_attributes(self, attrs, join="all"):
 		res = []
 		if join =="all":
@@ -597,6 +627,12 @@ class MMAX2MarkableLevel(object):
 
 	def is_empty(self):
 		return len(self.MARKABLES)==0
+
+	def get_namespace(self):
+		return self.NAMESPACE
+
+	def set_namespace(self, ns):
+		self.NAMESPACE=ns
 
 ###################################################################
 class MMAX2Project(object):                                       #
@@ -751,9 +787,6 @@ class MMAX2Markable(object):
 	def get_id(self):
 		return self.ID
 
-#	def get_text(self):
-#		return self.LEVEL.get_discourse().render_string(self.get_spanlists())[0]
-
 ###############################################################
 class MMAX2CommonPaths(object):                               #
 # Middle-weight class for handling system files and markables #
@@ -767,7 +800,7 @@ class MMAX2CommonPaths(object):                               #
 		self.BASEDATA_PATH 		= ""
 		self.CUSTOMIZATION_PATH = ""
 		self.MARKABLE_PATH 		= ""
-		self.VIEWS 				= views 		 if views          != None else ['generic_nongui_style.xsl']
+		self.VIEWS 				= views 		 if views          != None else []# ['generic_nongui_style.xsl']
 		self.MARKABLELEVELS 	= markablelevels if markablelevels != None else []
 		self.DISCOURSE 			= discourse
 
@@ -788,13 +821,50 @@ class MMAX2CommonPaths(object):                               #
 		def_style_path = os.path.dirname(self.FILE)+self.STYLE_PATH
 		if os.path.isdir(def_style_path)==False:
 			os.mkdirs(def_style_path)
-		if os.path.isfile(def_style_path+"/generic_nongui_style.xsl")==False:
-			with open(def_style_path+"/generic_nongui_style.xsl", 'w') as wout:
-				wout.write(STYLE_STUB)
 
+		def_scheme_path = os.path.dirname(self.FILE)+self.SCHEME_PATH			
+		if os.path.isdir(def_scheme_path)==False:
+			os.mkdirs(def_scheme_path)
+
+		def_cust_path = os.path.dirname(self.FILE)+self.CUSTOMIZATION_PATH			
+		if os.path.isdir(def_cust_path)==False:
+			os.mkdirs(def_cust_path)
+
+	def write_scheme_stub(self, for_levelname):
+		if not os.path.exists(self.DISCOURSE.get_mmax2_path(full=False)+self.SCHEME_PATH+for_levelname+"_scheme.xml"):
+			with open(self.DISCOURSE.get_mmax2_path(full=False)+self.SCHEME_PATH+for_levelname+"_scheme.xml","w") as sout:
+				sout.write(SCHEME_STUB)
+		else:
+			print(self.DISCOURSE.get_mmax2_path(full=False)+self.SCHEME_PATH+for_levelname+"_scheme.xml exists!")
+
+	def write_customization_stub(self, for_levelname):
+		if not os.path.exists(self.DISCOURSE.get_mmax2_path(full=False)+self.CUSTOMIZATION_PATH+for_levelname+"_customization.xml"):
+			with open(self.DISCOURSE.get_mmax2_path(full=False)+self.CUSTOMIZATION_PATH+for_levelname+"_customization.xml","w") as sout:
+				sout.write(CUSTOMIZATION_STUB)
+		else:
+			print(self.DISCOURSE.get_mmax2_path(full=False)+self.CUSTOMIZATION_PATH+for_levelname+"_customization.xml exists!")
+
+	def write_style_stub(self):
+		if not os.path.exists(self.DISCOURSE.get_mmax2_path(full=False)+self.STYLE_PATH+"/generic_nongui_style.xsl"):
+			with open(self.DISCOURSE.get_mmax2_path(full=False)+self.STYLE_PATH+"/generic_nongui_style.xsl","w") as sout:
+				sout.write(STYLE_STUB)
+		else:
+			print(self.DISCOURSE.get_mmax2_path(full=False)+self.STYLE_PATH+"/generic_nongui_style.xsl exists!")
+
+	def get_discourse(self):
+		return self.DISCOURSE
 
 	def get_basedata_path(self):
 		return self.BASEDATA_PATH
+
+	def get_markable_path(self):
+		return self.MARKABLE_PATH
+
+	def get_style_path(self):
+		return self.STYLE_PATH
+
+	def get_scheme_path(self):
+		return self.SCHEME_PATH
 
 	def get_commonpaths_path(self):
 		return os.path.dirname(self.FILE)+"/"
@@ -808,8 +878,9 @@ class MMAX2CommonPaths(object):                               #
 		for ml in self.MARKABLELEVELS:
 			# Replace project name placeholder $ with actual project names
 			# Use .mmax file basename - last 5 chars (.mmax)
-			if ml.get_file_name().find("$")!=-1:
-				ml.set_file_name(ml.get_file_name().replace("$", ntpath.basename(mmax2proj.FILE)[0:-5]))
+			if ml.get_filename().find("$")!=-1:
+				ml.set_filename_is_expanded()
+				ml.set_filename(ml.get_filename().replace("$", ntpath.basename(mmax2proj.FILE)[0:-5]))
 			if verbose: 
 				print("Probing annotation scheme at "+mmax2proj.get_mmax2_path()+self.SCHEME_PATH+ml.get_scheme(), file=sys.stderr)
 				if os.path.exists(mmax2proj.get_mmax2_path()+self.SCHEME_PATH+ml.get_scheme()):
@@ -823,6 +894,14 @@ class MMAX2CommonPaths(object):                               #
 
 	def write(self, overwrite=False):
 		if not os.path.exists(self.FILE) or overwrite:
+			if os.path.exists(self.FILE):
+				# Rename to backup instead of overwriting
+				bak_name=self.FILE+"."+str(int(time.time()*1000.0))
+				print("File exists, creating backup "+bak_name)
+				try:
+					os.rename(self.FILE,bak_name)
+				except Exception as ex:
+					print("Could not create backup!",ex)
 			with open(self.FILE, mode="w") as bout:
 				bout.write('<?xml version="1.0"?>\n')
 				bout.write("<common_paths>\n")
@@ -837,9 +916,19 @@ class MMAX2CommonPaths(object):                               #
 				bout.write("</views>\n")			
 				bout.write("<annotations>\n")
 				for m in self.MARKABLELEVELS:
-					bout.write('<level name="'+m.get_name()+'" schemefile="'+m.get_scheme()+'" customization_file="'+m.get_customization()+'">'+m.get_file_name()+'</level>\n')
+					filename=m.get_filename()
+					if m.get_filename_is_expanded():
+						# filename MUST start with project name. This part will be expanded back for writing the customization file.
+						projname=ntpath.basename(self.get_discourse().get_mmax2_path(full=True))[0:-5]
+						assert filename.startswith(projname)
+						filename=filename.replace(projname,"$",1)
+						#filename="$"+filename[0:len(projname)]
+					bout.write('<level name="'+m.get_name()+'" schemefile="'+m.get_scheme()+'" customization_file="'+m.get_customization()+'" at_startup="'+m.get_at_startup()+'">'+filename+'</level>\n')
 				bout.write("</annotations>\n")			
 				bout.write('</common_paths>\n')
+		else:
+			print(self.FILE+" exists and overwrite=False!")
+
 
 	def read(self, verbose=False):
 		with open(self.FILE, mode="r") as rin:
@@ -875,12 +964,13 @@ class MMAX2CommonPaths(object):                               #
 					level = MMAX2MarkableLevel(s['name'], 
 											self.DISCOURSE,
 											s.text,
-											namespace=s['name'], 
+											namespace=None,
 											scheme=s['schemefile'], 
 											customization=s['customization_file'], 
 											create_if_missing=False, 
 											encoding='utf-8',
-											verbose=verbose)
+											verbose=verbose,
+											at_startup=s.get("at_startup","active"))
 					self.MARKABLELEVELS.append(level)
 			except IndexError:
 				self.MARKABLELEVELS=[]
@@ -1370,3 +1460,12 @@ class MultipleInvalidMMAX2AttributeExceptions(Exception):
 
 class MaxSizeException(Exception):
 	pass
+
+class MarkableLevelExistsException(Exception):
+	def __init__(self, level):
+		self.level 	= level
+		# Call Exception super class
+		super().__init__("Markablelevel "+self.level+" already exists!")
+
+#	def __str__(self):
+#		return '\n\nLevel: '+ self.level+', ID: ' + self.m_id + f'\n{Fore.BLACK}{Style.NORMAL}Supplied: ' + str(self.supplied_attribs)+f'\n{Fore.BLACK}{Back.GREEN}{Style.NORMAL}Valid:    '+str(self.valid_attribs)+f'{Style.RESET_ALL}\n{Fore.YELLOW}{Back.RED}{Style.NORMAL}Invalid:  '+str(self.extra_attribs)+f'{Style.RESET_ALL}\n{Fore.YELLOW}{Back.RED}{Style.NORMAL}Missing:  '+str(self.missing_attribs)+f'{Style.RESET_ALL}'
