@@ -128,6 +128,8 @@ As a result, loading markables with the (now invalid) 'ne' value will raise a va
 Single exceptions are collected during bulk markable loading, and another exception is raised at the end.
 The above output is the result of handling this exception. 
 
-### Access to MMAX2 Data
+### Accessing MMAX2 Data and Creating Annotations
+One of the motivations for creating pyMMAX2 was to allow for an easier integration of MMAX2 with the wide range of NLP and ML tools in the Python ecosystem.
+In the following, **NLTK** is used to add a POS level to an existing collection of annotation projects, again from the ACL Anthology dataset.
 
-tbc
+Adding a new level without a pre-existing annotation scheme to an existing MMAX2 project is one of the use cases that can be solved without annotation scheme evaluation, which is why the following example is called without the `--mmax2_libs` parameter.
