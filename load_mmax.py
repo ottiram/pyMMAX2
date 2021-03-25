@@ -32,3 +32,21 @@ for f in files:
 		print('%s validation exceptions, e.g.\n%s'%(str(mive.get_exception_count()),
 			                             str(mive.get_exception_at(0)).strip()))
 	pd.info()
+
+	# Get dict of all coref sets in current discourse
+	coref_sets = pd.get_markablelevel_by_name("coref").get_markablesets(set_att="coref_class")
+	pvg = Network(height='100%', width='100%', layout=False)
+#	pvg.force_atlas_2based(overlap=1, damping=1, spring_length=200, central_gravity=0.0005)
+	# Go over all coref set ids
+	for set_id in coref_sets:
+		coref_sets[set_id].to_discourse_order()
+		for m in coref_sets[set_id].get_markables():
+			pvg.add_node(m.get_id(), mass=5, shape='box', borderWidth=3, shadow=True, font="8 courier black bold", label=m.render_string()[0], pos=m.get_discourse_position())
+#			print(pvg.nodes)
+			if len(pvg.node_ids)>1:
+				a_id=pvg.node_ids[-1]
+				b_id=pvg.node_ids[-2]
+				pvg.add_edge(a_id,b_id, weight=pvg.nodes[-1]['pos']-pvg.nodes[-2]['pos'], label=str(pvg.nodes[-1]['pos']-pvg.nodes[-2]['pos']))
+	pvg.toggle_physics(True)
+	pvg.show_buttons()
+	pvg.save_graph("test.html")
