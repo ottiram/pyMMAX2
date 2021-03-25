@@ -2,7 +2,7 @@
 
 This is the repository for pyMMAX2, a Python API for MMAX2. pyMMAX2 is introduced in <a href="https://github.com/nlpAThits/pyMMAX2/raw/main/LAW20_Final.pdf">this paper</a>, presented as a poster at <a href="https://sigann.github.io/LAW-XIV-2020/">LAW 2020</a>.
 
-**This site is currently under construction, stay tuned!**
+**This site is permanently under construction, while new functionality is being added! Get in touch if you have questions or comments, or want to contribute!**
 
 ### Installation
 Perform the following steps for a minimal installation. For actual applications, simply install pyMMAX2 and its required dependencies (if not installed already) into your working environment.
@@ -133,3 +133,44 @@ One of the motivations for creating pyMMAX2 was to allow for an easier integrati
 In the following, **NLTK** is used to add a POS level to an existing collection of annotation projects, again from the ACL Anthology dataset.
 
 Adding a new level without a pre-existing annotation scheme to an existing MMAX2 project is one of the use cases that can be solved without annotation scheme evaluation, which is why the following example is called without the `--mmax2_libs` parameter.
+The following will add a markable level called 'pos' to all MMAX2 projects in the /C/ subfolder of the ACl Anthology dataset.
+
+```
+$ python postag_acl_coref.py \
+  --mmax_dir ../MMAX2-Showcase/acl_anthology_coref_coling_2012/C/ \
+  --common_paths ../MMAX2-Showcase/acl_anthology_coref_coling_2012/common_files/global_common_paths.xml
+
+This is pyMMAX2 version 0.57
+Creating MMAX2Project from ../MMAX2-Showcase/acl_anthology_coref_coling_2012/C/C02-1004/C02-1004.mmax
+Reading .mmax file at ../MMAX2-Showcase/acl_anthology_coref_coling_2012/C/C02-1004/C02-1004.mmax
+Reading common paths info from ../MMAX2-Showcase/acl_anthology_coref_coling_2012/common_files/global_common_paths.xml
+Creating markable level coref
+Creating markable level sentence
+Loading basedata from ../MMAX2-Showcase/acl_anthology_coref_coling_2012/C/C02-1004/./Basedata/C02-1004_words.xml
+	Loaded 3568 basedata elements
+Level file name set to C02-1004_coref_level.xml
+Level file name set to C02-1004_sentence_level.xml
+Level pos not found.
+Level file name set to $_pos_level.xml
+File exists, creating backup ../MMAX2-Showcase/acl_anthology_coref_coling_2012/common_files/global_common_paths.xml.1605538146931
+Level file name set to C02-1004_pos_level.xml
+Writing to ../MMAX2-Showcase/acl_anthology_coref_coling_2012/C/C02-1004/./Markables/C02-1004_pos_level.xml
+
+<SNIP>
+
+This is pyMMAX2 version 0.57
+Creating MMAX2Project from ../MMAX2-Showcase/acl_anthology_coref_coling_2012/C/C02-1002/C02-1002.mmax
+Reading .mmax file at ../MMAX2-Showcase/acl_anthology_coref_coling_2012/C/C02-1002/C02-1002.mmax
+Reading common paths info from ../MMAX2-Showcase/acl_anthology_coref_coling_2012/common_files/global_common_paths.xml
+Creating markable level coref
+Creating markable level sentence
+Creating markable level pos
+Loading basedata from ../MMAX2-Showcase/acl_anthology_coref_coling_2012/C/C02-1002/./Basedata/C02-1002_words.xml
+	Loaded 4435 basedata elements
+Level file name set to C02-1002_coref_level.xml
+Level file name set to C02-1002_sentence_level.xml
+Level file name set to C02-1002_pos_level.xml
+Markables at ../MMAX2-Showcase/acl_anthology_coref_coling_2012/C/C02-1002/./Markables/C02-1002_pos_level.xml not found, skipping!
+Writing to ../MMAX2-Showcase/acl_anthology_coref_coling_2012/C/C02-1002/./Markables/C02-1002_pos_level.xml
+```
+Note that in the above, after processing the first MMAX2 project found in the folder, the global_common_paths.xml file is saved, effectively adding the new markable level to **all** MMAX2 projects in the scope of that file.
