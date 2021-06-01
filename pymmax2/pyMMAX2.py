@@ -144,7 +144,40 @@ class MMAX2Discourse(object):                       #
 	def get_mmax2_project(self):
 		return self.MMAX2_PROJECT
 
-	def info(self):
+	def info(self, mono=False):
+		res="\nMMAX2 Project Info:\n"
+		res=res+"-------------------\n"
+		if not mono:
+			res=res+".mmax file        :"+ f'{Fore.BLUE}'+str(self.MMAX2_PROJECT.get_mmax2_path(full=True))+f'{Style.RESET_ALL}'+"\n"
+			res=res+"Basedata elements :"+ f'{Fore.BLUE}'+str(self.get_bd_count())+f'{Style.RESET_ALL}'+"\n"
+			res=res+"Markable levels   :\n"
+		else:
+			res=res+".mmax file        :"+ str(self.MMAX2_PROJECT.get_mmax2_path(full=True))+"\n"
+			res=res+"Basedata elements :"+ str(self.get_bd_count())+"\n"
+			res=res+"Markable levels   :\n"
+
+		for i in self.COMMONPATHS.MARKABLELEVELS:
+			def_att_string="Annotation scheme instance not available!"
+			default_attrib_list, _ = i.get_default_attributes()
+			if default_attrib_list != None:
+				def_att_string=""
+				for t,a,v,b in default_attrib_list:
+					# Mark branching attributes 
+					if b:
+						a="<>"+str(a)
+					def_att_string=def_att_string+str(a)+":"+str(v)+", "
+				if def_att_string!="":
+					def_att_string=def_att_string[0:-2]
+				else:
+					def_att_string="none defined"
+			if not mono:				
+				res=res+" "+i.get_name().ljust(16)+" : "+f'{Fore.BLUE}'+ str(len(i.get_all_markables())).rjust(5)  +f'{Style.RESET_ALL}'+" markables [DEFAULT: "+f'{Fore.BLUE}'+def_att_string+f'{Style.RESET_ALL}]'+"\n"
+			else:
+				res=res+" "+i.get_name().ljust(16)+" : "+str(len(i.get_all_markables())).rjust(5) +" markables [DEFAULT: "+def_att_string+"]\n"
+		return res
+
+	def info_(self):
+		res=""
 		print("\nMMAX2 Project Info:")
 		print("-------------------")
 		print(".mmax file        :", f'{Fore.BLUE}'+str(self.MMAX2_PROJECT.get_mmax2_path(full=True))+f'{Style.RESET_ALL}')
@@ -165,6 +198,7 @@ class MMAX2Discourse(object):                       #
 				else:
 					def_att_string="none defined"
 			print(" "+i.get_name().ljust(16)+" : "+f'{Fore.BLUE}'+ str(len(i.get_all_markables())).rjust(5)  +f'{Style.RESET_ALL}'+" markables [DEFAULT: "+f'{Fore.BLUE}'+def_att_string+f'{Style.RESET_ALL}]')
+
 
 	def get_markablelevel_by_name(self, name, verbose=False):
 	# Deprecated: Use get_markablelevel(name)
@@ -955,7 +989,7 @@ class MMAX2Markable(object):
 		m=True
 		if len(attrs)>0:	# Empty attrs matches always
 			for k,v in attrs.items():
-#				print(v)
+#				print(k,v)
 				if v.startswith("***"):
 					v=v[3:]
 					# v is a regexp
@@ -1586,12 +1620,26 @@ class PhraseAnnotator(object):
 
 
 
-def kwic_string_for_elements(bd_id_list, basedata, width=5, fillwidth=100, lsep="_>>", rsep="<<_"):
+def kwic_string_for_elements(bd_id_list, basedata, width=5, fillwidth=100, lsep="_>>", rsep="<<_", strip=False):
 # continuous elements only
 #	m_start=markable.get_spanlists()[0][0]
 #	m_end=markable.get_spanlists()[-1][-1]
-	pre_bd, lpadded=basedata.get_preceeding_elements(bd_id_list[0], width=width)
-	fol_bd, rpadded=basedata.get_following_elements(bd_id_list[-1], width=width)
+	pre_bd_tmp, lpadded=basedata.get_preceeding_elements(bd_id_list[0], width=width)
+	# Make sure that atts is not None (which is the default for memory economy)
+	# Not too efficient ...
+	pre_bd=[]
+	for (s,bdid,pos,att) in pre_bd_tmp:
+		if att==None:
+			att={}
+		pre_bd.append((s,bdid,pos,att))
+
+	fol_bd_tmp, rpadded=basedata.get_following_elements(bd_id_list[-1], width=width)
+	fol_bd=[]
+	for (s,bdid,pos,att) in fol_bd_tmp:
+		if att==None:
+			att={}
+		fol_bd.append((s,bdid,pos,att))
+
 	lc,rc="",""
 
 	if lpadded:	lc="*B_O_BDATA*"
@@ -1604,7 +1652,8 @@ def kwic_string_for_elements(bd_id_list, basedata, width=5, fillwidth=100, lsep=
 		rc=" "+rc+ "*E_O_BDATA*"
 	else:
 		rc=" "+rc
-	bd_elem_string=render_string([bd_id_list], basedata, brackets=False, mapping=False)[0]
+	bd_elem_string=basedata.render_string([bd_id_list], brackets=False, mapping=False)[0]
+	if strip: bd_elem_string=bd_elem_string.strip()
 	lc=lc+lsep
 	return lc.rjust(fillwidth)+bd_elem_string+rsep+rc
 
