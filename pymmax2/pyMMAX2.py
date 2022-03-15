@@ -1,11 +1,10 @@
-import sys, os, codecs, ntpath, pkg_resources, colorama, binascii, time
+import sys, os, codecs, pkg_resources, colorama, binascii, time
 
 from bs4 import BeautifulSoup as bs
 from bs4.dammit import EncodingDetector
 
 from xml.sax.saxutils import escape
 from colorama import Fore, Back, Style
-#from unicodedata import category
 import unicodedata
 from collections import OrderedDict
 import regex as re
@@ -268,7 +267,7 @@ class MMAX2Discourse(object):                       #
 
 
     def get_markablelevel_by_name(self, name, verbose=False):
-    # Deprecated: Use get_markablelevel(name)
+    # Deprecated: Use get_level(name)
         r=None
         for i in self.COMMONPATHS.MARKABLELEVELS:
             if i.get_name()==name:
@@ -279,11 +278,11 @@ class MMAX2Discourse(object):                       #
             if verbose: print("Level %s not found."%name, file=sys.stderr)
         return r
 
-    def get_markablelevel(self, name, verbose=False):
-        return self.get_markablelevel_by_name(name,verbose)
+#    def get_markablelevel(self, name, verbose=False):
+#        return self.get_markablelevel_by_name(name,verbose)
 
     def get_level(self, name, verbose=False):
-        return self.get_markablelevel(name, verbose=verbose)
+        return self.get_markablelevel_by_name(name, verbose=verbose)
 
     # This matches cross-basedata, so it is independent of tokenization
     def match_basedata(self, regexes, spanlists, verbose=False, ignore_case=False):
@@ -364,62 +363,62 @@ class MMAX2Discourse(object):                       #
     def render_bracketed_string(self, for_ids=None, markables=None, verbose=False):
         return self.get_basedata().render_bracketed_string(for_ids=for_ids, markables=markables, verbose=verbose)
 
-    # sort = alpha_asc, alpha_desc, freq_asc, freq_desc
-    def get_tf_dict(self, bd_type="words", ignore_case=True, sort="", strip=False, overlay_level=None, verbose=False):
-        raw_tf_dict={}
-        mwe_tf_dict={}
-        processed_markables=set()
-        for t in self.MMAX2_PROJECT.get_basedata(bd_type).get_elements():           
-            word=t[0]
-            if ignore_case:     word=word.lower()
-            if strip:           word=word.strip()
+#     # sort = alpha_asc, alpha_desc, freq_asc, freq_desc
+#     def get_tf_dict(self, bd_type="words", ignore_case=True, sort="", strip=False, overlay_level=None, verbose=False):
+#         raw_tf_dict={}
+#         mwe_tf_dict={}
+#         processed_markables=set()
+#         for t in self.MMAX2_PROJECT.get_basedata(bd_type).get_elements():           
+#             word=t[0]
+#             if ignore_case:     word=word.lower()
+#             if strip:           word=word.strip()
 
-            try:                raw_tf_dict[word] += 1
-            except KeyError:    raw_tf_dict[word] = 1
+#             try:                raw_tf_dict[word] += 1
+#             except KeyError:    raw_tf_dict[word] = 1
 
-            if overlay_level != None:
-#               olms=overlay_level.get_started_markables(t[1])
-                olms=overlay_level.get_markables_for_basedata(t[1])
-                if len(olms)==0:
-                    # No overlayed markable
-                    try:                mwe_tf_dict[word] += 1    
-                    except KeyError:    mwe_tf_dict[word] = 1
-                    if verbose: print(word)
-                elif len(olms)==1:
-                    # Count only once
-                    if olms[0].get_id() not in processed_markables:
-                        word=olms[0].get_text(self.MMAX2_PROJECT.get_basedata(bd_type))
-                        if ignore_case:     word=word.lower()
-                        if strip:           word=word.strip()
-                        if verbose: print(word)
-                        try:                mwe_tf_dict[word] += 1
-                        except KeyError:    mwe_tf_dict[word] = 1
-                        processed_markables.add(olms[0].get_id())
-                else:
-                    print("Multiple markables not yet supported!")
-                    pass
-            else:
-                if verbose: print(word)
-                try:                mwe_tf_dict[word] += 1    
-                except KeyError:    mwe_tf_dict[word]  = 1
+#             if overlay_level != None:
+# #               olms=overlay_level.get_started_markables(t[1])
+#                 olms=overlay_level.get_markables_for_basedata(t[1])
+#                 if len(olms)==0:
+#                     # No overlayed markable
+#                     try:                mwe_tf_dict[word] += 1    
+#                     except KeyError:    mwe_tf_dict[word] = 1
+#                     if verbose: print(word)
+#                 elif len(olms)==1:
+#                     # Count only once
+#                     if olms[0].get_id() not in processed_markables:
+#                         word=olms[0].get_text(self.MMAX2_PROJECT.get_basedata(bd_type))
+#                         if ignore_case:     word=word.lower()
+#                         if strip:           word=word.strip()
+#                         if verbose: print(word)
+#                         try:                mwe_tf_dict[word] += 1
+#                         except KeyError:    mwe_tf_dict[word] = 1
+#                         processed_markables.add(olms[0].get_id())
+#                 else:
+#                     print("Multiple markables not yet supported!")
+#                     pass
+#             else:
+#                 if verbose: print(word)
+#                 try:                mwe_tf_dict[word] += 1    
+#                 except KeyError:    mwe_tf_dict[word]  = 1
 
-        if sort != "":
-            if sort ==    "alpha_asc":
-                raw_tf_dict = OrderedDict(sorted(raw_tf_dict.items(), key=lambda t: t[0]))
-                mwe_tf_dict = OrderedDict(sorted(mwe_tf_dict.items(), key=lambda t: t[0]))              
-            elif sort == "alpha_desc":
-                raw_tf_dict = OrderedDict(sorted(raw_tf_dict.items(), key=lambda t: t[0], reverse=True))
-                mwe_tf_dict = OrderedDict(sorted(mwe_tf_dict.items(), key=lambda t: t[0], reverse=True))                
-            elif sort == "freq_asc":
-                raw_tf_dict = OrderedDict(sorted(raw_tf_dict.items(), key=lambda t: t[1]))
-                mwe_tf_dict = OrderedDict(sorted(mwe_tf_dict.items(), key=lambda t: t[1]))              
-            elif sort == "freq_desc":
-                raw_tf_dict = OrderedDict(sorted(raw_tf_dict.items(), key=lambda t: t[1], reverse=True))
-                mwe_tf_dict = OrderedDict(sorted(mwe_tf_dict.items(), key=lambda t: t[1], reverse=True))                
-        return raw_tf_dict, mwe_tf_dict
+#         if sort != "":
+#             if sort ==    "alpha_asc":
+#                 raw_tf_dict = OrderedDict(sorted(raw_tf_dict.items(), key=lambda t: t[0]))
+#                 mwe_tf_dict = OrderedDict(sorted(mwe_tf_dict.items(), key=lambda t: t[0]))              
+#             elif sort == "alpha_desc":
+#                 raw_tf_dict = OrderedDict(sorted(raw_tf_dict.items(), key=lambda t: t[0], reverse=True))
+#                 mwe_tf_dict = OrderedDict(sorted(mwe_tf_dict.items(), key=lambda t: t[0], reverse=True))                
+#             elif sort == "freq_asc":
+#                 raw_tf_dict = OrderedDict(sorted(raw_tf_dict.items(), key=lambda t: t[1]))
+#                 mwe_tf_dict = OrderedDict(sorted(mwe_tf_dict.items(), key=lambda t: t[1]))              
+#             elif sort == "freq_desc":
+#                 raw_tf_dict = OrderedDict(sorted(raw_tf_dict.items(), key=lambda t: t[1], reverse=True))
+#                 mwe_tf_dict = OrderedDict(sorted(mwe_tf_dict.items(), key=lambda t: t[1], reverse=True))                
+#         return raw_tf_dict, mwe_tf_dict
 
-    def add_basedata_elements_from_string_DEP(self, string, bd_type="words", verbose=False):
-        return self.get_basedata(bd_type=bd_type).add_elements_from_string(string, verbose=verbose)
+#     def add_basedata_elements_from_string_DEP(self, string, bd_type="words", verbose=False):
+#         return self.get_basedata(bd_type=bd_type).add_elements_from_string(string, verbose=verbose)
 
     def get_commonpaths(self):
         return self.COMMONPATHS
@@ -611,16 +610,16 @@ class MMAX2MarkableLevel(object):
             as_file=to_path+os.path.basename(self.FILE)
 
         if os.path.exists(as_file) and not overwrite:
-            print("File exists and overwrite is FALSE!\n\t",as_file)
+            print("File exists and overwrite is FALSE!\n\t"+str(as_file), file=sys.stderr)
             return
         if os.path.exists(as_file) and not no_backup :
             # Rename to backup instead of overwriting
             bak_name=as_file+"."+str(int(time.time()*1000.0))
-            print("File exists, creating backup "+bak_name)
+            print("File exists, creating backup "+bak_name, file=sys.stderr)
             try:
                 os.rename(as_file,bak_name)
             except Exception as ex:
-                print("Could not create backup!",ex)
+                print("Could not create backup! "+str(ex), file=sys.stderr)
 
         if verbose: print("Writing to",as_file)
 
@@ -719,8 +718,6 @@ class MMAX2MarkableLevel(object):
 
             # Make sure that *extra* attributes which could not be consumed also trigger a validation exception, just like missing ones
             if len(invalid)>0 or len(missing)>0:    validation_errors=True
-#        else:
-#            print("Cannot validate, no annotation scheme!")
         return validation_errors, supplied, valid, invalid, missing
 
     # This returns (None, None) if no connection to annotation scheme is available,
@@ -985,9 +982,6 @@ class MMAX2MarkableLevel(object):
         # Deprecated
         return self.get_markables()# self.MARKABLES
 
-    def get_markables_BAK(self):
-        return self.MARKABLES
-
     def get_markables(self):
         #return self.MARKABLES
         return [l[0] for l in sorted([(m, m.get_discourse_position()[0]) for m in self.MARKABLES], key=itemgetter(1))]
@@ -1117,15 +1111,15 @@ class MMAX2Markable(object):
     def match_string(self, regexes, ignore_case=False, precompiled=False, verbose=False):
         return self.LEVEL.get_discourse().get_basedata().match_string(regexes, for_ids=[flatten_spanlists(self.SPANLISTS)], ignore_case=ignore_case, precompiled=precompiled, verbose=verbose)
 
-    def to_matchable_string_bak(self, main_att, det_atts):
-        m_text="["+str(self.get_attributes().get(main_att,'NONE')).upper()
-        for g in det_atts:
-            if g == "_string":
-                m_text=m_text+";STRING="+self.render_string()[0].strip()
-            else:
-                m_text=m_text+";"+g.upper()+"="+str(self.get_attributes().get(g,'NONE')).upper()
-        m_text=m_text+"]"
-        return m_text
+    # def to_matchable_string_bak(self, main_att, det_atts):
+    #     m_text="["+str(self.get_attributes().get(main_att,'NONE')).upper()
+    #     for g in det_atts:
+    #         if g == "_string":
+    #             m_text=m_text+";STRING="+self.render_string()[0].strip()
+    #         else:
+    #             m_text=m_text+";"+g.upper()+"="+str(self.get_attributes().get(g,'NONE')).upper()
+    #     m_text=m_text+"]"
+    #     return m_text
 
     # rendering order is determined by order in in det_atts
     def to_matchable_string(self, det_atts):
@@ -1281,20 +1275,15 @@ class MMAX2Markable(object):
     def render_string(self, brackets=False, mapping=False):
         # This renders self as string by passing self.SPANLISTS to basedata rendering.
         # When rendering *discontinuous* markables, brackets should be *required*
-#        if not brackets and len(self.SPANLISTS)>1:
-#            print("Forcing brackets for discontinuous markable!")
-#            brackets=True
         return (self.LEVEL.get_discourse().get_basedata().render_string(for_ids=self.SPANLISTS, brackets=brackets, mapping=mapping))
 
     def get_spanlists(self):
         return self.SPANLISTS
 
     def matches_all(self,attrs):
-#       print(attrs)
         m=True
         if len(attrs)>0:    # Empty attrs matches always
             for k,v in attrs.items():
-#               print(k,v)
                 if v.startswith("***"):
                     v=v[3:]
                     # v is a regexp
@@ -1302,12 +1291,9 @@ class MMAX2Markable(object):
                         # re.match returns None and not False
                         if k=='_string':
                             to_match=self.render_string()[0].strip()
-#                           print(to_match)
                         else:
                             # Cast to string if att comes from Java ...
                             to_match=str(self.ATTRIBUTES[k])
-#                       print(type(v),type(to_match))
-#                       print(v, to_match)
                         if re.match(v,to_match)==None:
                             m=False
                             break
@@ -1335,7 +1321,6 @@ class MMAX2Markable(object):
 
 
     # A markable's discourse position is the discourse position of its first basedata element.
-    # INCORRECT! 
     def get_discourse_position(self):
         return self.DISC_POS
 
@@ -1471,7 +1456,7 @@ class MMAX2CommonPaths(object):                               #
             # Use .mmax file basename - last 5 chars (.mmax)
             if ml.get_filename().find("$")!=-1:
                 ml.set_filename_is_expanded()
-                ml.set_filename(ml.get_filename().replace("$", ntpath.basename(mmax2proj.FILE)[0:-5]))
+                ml.set_filename(ml.get_filename().replace("$", os.path.basename(mmax2proj.FILE)[0:-5]))
             if verbose: 
                 #print("Probing annotation scheme at "+mmax2proj.get_mmax2_path()+self.SCHEME_PATH+ml.get_scheme(), file=sys.stderr)
                 print("Probing annotation scheme at "+os.path.realpath(mmax2proj.get_mmax2_path()+self.SCHEME_PATH+ml.get_scheme()), file=sys.stderr)
@@ -1520,7 +1505,7 @@ class MMAX2CommonPaths(object):                               #
                     filename=m.get_filename()
                     if m.get_filename_is_expanded():
                         # filename MUST start with project name. This part will be expanded back for writing the customization file.
-                        projname=ntpath.basename(self.get_discourse().get_mmax2_path(full=True))[0:-5]
+                        projname=os.path.basename(self.get_discourse().get_mmax2_path(full=True))[0:-5]
                         assert filename.startswith(projname)
                         filename=filename.replace(projname,"$",1)
                         #filename="$"+filename[0:len(projname)]
@@ -1724,92 +1709,6 @@ class Basedata(object):
         return bd_ids
 
 
-    # Returns bd_id span    
-    def add_elements_from_string_bak(self, uc_string, isolate_numbers=False, verbose=False):
-        if verbose: print("\n", uc_string)
-        bd_ids=[]
-        w=""
-        spaces=0
-        # Go through input string
-        # Get current char
-        for i in uc_string:
-            # if verbose: print("\t", i, unicodedata.category(i))
-            if unicodedata.category(i) in ['Sc', 'Sm', 'So', 'Zl','Zp', 'Zs', 'Pc', 'Pd','Pe', 'Pf', 'Pi', 'Po', 'Ps', 'Cf', 'Cc']:
-                # Current char is a saveable separator OR a space
-                # Save current token *before* separator, if any
-                if w != "":
-                    # We have accumulated some token
-                    # spc is the number of spaces to be rendered *before* this token, 
-                    # so the current one (if it is one) should not count here!
-                    # Save token accumulated so far.
-                    if not isolate_numbers:
-                        # Normal case
-                        if spaces !=1:  bd_ids.append(self.add_element(w, bd_attribs={'spc':str(spaces)}))
-                        else:           bd_ids.append(self.add_element(w))
-                    else:
-                        # Split w at all points where string and numeric values change
-                        # and save each in isolation. spaces is valid for index 0 only
-                        segs = list(filter(None, re.split(r'(\d+)', w)))
-                        # print(segs)
-                        for v,seg in enumerate(segs):
-                            if v == 0: 
-                                # Write real space (if any) to *first* seg only
-                                if spaces !=1:  bd_ids.append(self.add_element(seg, bd_attribs={'spc':str(spaces)}))
-                                else:           bd_ids.append(self.add_element(seg))
-                            else:
-                                # Following segs have zero distance
-                                bd_ids.append(self.add_element(seg, bd_attribs={'spc':'0'}))
-                    # Reset token accumulated so far
-                    w=""
-                    spaces=0
-
-                if unicodedata.category(i) not in ['Zl','Zp', 'Zs', 'Cf', 'Cc']:
-                    # Save separator, unless a space or newline
-                    if not isolate_numbers:
-                        if spaces !=1:  bd_ids.append(self.add_element(i, bd_attribs={'spc':str(spaces)}))
-                        else:           bd_ids.append(self.add_element(i))
-                    else:
-                        # Split i at all points where string and numeric values change
-                        # and save each in isolation. spaces is valid for index 0 only
-                        segs = list(filter(None, re.split(r'(\d+)', i)))
-                        # print(segs)
-                        for v,seg in enumerate(segs):
-                            if v == 0: 
-                                # Write real space (if any) to *first* seg only
-                                if spaces !=1:  bd_ids.append(self.add_element(seg, bd_attribs={'spc':str(spaces)}))
-                                else:           bd_ids.append(self.add_element(seg))
-                            else:
-                                # Following segs have zero distance
-                                bd_ids.append(self.add_element(seg, bd_attribs={'spc':'0'}))
-
-                    # Reset space counter
-                    spaces=0
-                else:
-                    spaces+=1
-            else:
-                # Current char is not a separator, collect char for token
-                w+=i
-        if w != "":
-            # We have accumulated some token
-            # spc is the number of spaces to be rendered *before* this token, 
-            # so the current one (if it is one) should not count here!
-            # Save token accumulated so far.
-            if not isolate_numbers:
-                if spaces !=1:  bd_ids.append(self.add_element(w, bd_attribs={'spc':str(spaces)}))
-                else:           bd_ids.append(self.add_element(w))
-            else:
-                # Split w at all points where string and numeric values change
-                # and save each in isolation. spaces is valid for index 0 only
-                segs = list(filter(None, re.split(r'(\d+)', w)))
-                for v,seg in enumerate(segs):
-                    if v == 0: 
-                        # Write real space (if any) to *first* seg only
-                        if spaces !=1:  bd_ids.append(self.add_element(seg, bd_attribs={'spc':str(spaces)}))
-                        else:           bd_ids.append(self.add_element(seg))
-                    else:
-                        # Following segs have zero distance
-                        bd_ids.append(self.add_element(seg, bd_attribs={'spc':'0'}))
-        return bd_ids
 
 
     def render_string(self, for_ids=None, brackets=False, mapping=False, replacements=None):
@@ -2078,9 +1977,9 @@ class Basedata(object):
                 break
         return r
 
-    def get_preceeding_elements(self, bd_id, width=10):
-        print("Deprecated! Use get_preceding_elements(bd_id, width=width)!")
-        return self.get_preceding_elements(bd_id, width=width)
+    # def get_preceeding_elements(self, bd_id, width=10):
+    #     print("Deprecated! Use get_preceding_elements(bd_id, width=width)!")
+    #     return self.get_preceding_elements(bd_id, width=width)
 
     def get_preceding_elements(self, bd_id, width=10):
         for (pos,i) in enumerate(self.DCELEMENTS):
@@ -2194,65 +2093,65 @@ class PhraseAnnotator(object):
 
 
 
-# This matches cross-basedata, so it is independent of tokenization
-def match_basedata_bak(regexes, spanlists, ignore_case=False, verbose=False):
-    # regexes is a list of (regex, label, sample) tuples, label is optional
-    all_results=[]
+# # This matches cross-basedata, so it is independent of tokenization
+# def match_basedata_bak(regexes, spanlists, ignore_case=False, verbose=False):
+#     # regexes is a list of (regex, label, sample) tuples, label is optional
+#     all_results=[]
 
-#   testing=False
-#   if teststring != None:
-#       string=teststring
-#       testing=True
-#       verbose=True
+# #   testing=False
+# #   if teststring != None:
+# #       string=teststring
+# #       testing=True
+# #       verbose=True
 
-#   if not testing:
-    string, pos2id, pos2word=render_string(spanlists)
-#   else:
-#       pos2id={}
-#       pos2word={}
-    if ignore_case:
-        string=string.lower()
+# #   if not testing:
+#     string, pos2id, pos2word=render_string(spanlists)
+# #   else:
+# #       pos2id={}
+# #       pos2word={}
+#     if ignore_case:
+#         string=string.lower()
 
-    # Look at each reg individually
-    for exp in regexes:
-        reg=exp[0]
-        label=reg
-        if len(exp)>1:
-            label=exp[1]
+#     # Look at each reg individually
+#     for exp in regexes:
+#         reg=exp[0]
+#         label=reg
+#         if len(exp)>1:
+#             label=exp[1]
 
-        if testing:
-            print("\n"+reg)
-            print("\n"+string)
+#         if testing:
+#             print("\n"+reg)
+#             print("\n"+string)
 
-        pos=0
-        # Collect lists of span_for_match lists
-        results_for_reg=[]
+#         pos=0
+#         # Collect lists of span_for_match lists
+#         results_for_reg=[]
 
-        for match in re.finditer(reg,string,pos):
-            # None or one capturing group only
-#           group=0 if not match.groups() else 1
-#           if verbose: print(match.span(group))
-            group="m"
+#         for match in re.finditer(reg,string,pos):
+#             # None or one capturing group only
+# #           group=0 if not match.groups() else 1
+# #           if verbose: print(match.span(group))
+#             group="m"
 
-            start,end=match.span(group)
-            span_for_match=[]
+#             start,end=match.span(group)
+#             span_for_match=[]
 
-            if verbose: print("'%s'"%(match), file=sys.stderr)          
-            for t in range(start,end):
-                try:
-                    bd_id=pos2id[t]
-                except KeyError:
-                    # Skip space
-                    continue
-                if len(span_for_match) == 0 or span_for_match[-1]!=bd_id:
-                    span_for_match.append(bd_id)
-            if len(span_for_match)>0:
-                results_for_reg.append(([span_for_match],match))
-            pos=end-1
+#             if verbose: print("'%s'"%(match), file=sys.stderr)          
+#             for t in range(start,end):
+#                 try:
+#                     bd_id=pos2id[t]
+#                 except KeyError:
+#                     # Skip space
+#                     continue
+#                 if len(span_for_match) == 0 or span_for_match[-1]!=bd_id:
+#                     span_for_match.append(bd_id)
+#             if len(span_for_match)>0:
+#                 results_for_reg.append(([span_for_match],match))
+#             pos=end-1
 
-        if len(results_for_reg)>0:
-            all_results.append((results_for_reg,reg,label))
-    return all_results
+#         if len(results_for_reg)>0:
+#             all_results.append((results_for_reg,reg,label))
+#     return all_results
 
 
 
@@ -2298,31 +2197,6 @@ def span_overlap(full_span1, full_span2):
 def flatten_spanlists(spanlists):
     return [item for sublist in spanlists for item in sublist]
 
-#def pythonify_MMAX2Attribute(mmax2att):
-#   print(mmax2att.getDisplayAttributeName())
-
-
-#def int2bytes(i):
-#    hex_string = '%x' % i
-#    n = len(hex_string)
-#    return binascii.unhexlify(hex_string.zfill(n + (n & 1)))
-
-#def split_utf8(s, n=1):
-##  print(type(s))#
-#   start = 0
-#   lens = len(s)
-#   print(lens)
-#   while start < lens:
-#       if lens - start <= n:
-#           yield s[start:]
-#           return # StopIteration
-#       end = start + n
-#       print(2,type(s[end]), type(0x80))
-#       while 0x80 <= s[end] <= 0xBF:
-#           end -= 1
-#       assert end > start
-#       yield s[start:end]
-#       start = end
 
 
 #######################################
