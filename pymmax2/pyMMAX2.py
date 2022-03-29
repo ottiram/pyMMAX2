@@ -284,49 +284,50 @@ class MMAX2Discourse(object):                       #
     def get_level(self, name, verbose=False):
         return self.get_markablelevel_by_name(name, verbose=verbose)
 
-    # This matches cross-basedata, so it is independent of tokenization
-    def match_basedata(self, regexes, spanlists, verbose=False, ignore_case=False):
-        # regexes is a list of (regex, label) tuples, or just regexes, with a group named <m>
-        all_results=[]
-        string, pos2id, pos2word=self.render_string(spanlists)
-        if ignore_case:
-            string=string.lower()
+# REMOVED: This should use the match_string method on basedata
+    # # This matches cross-basedata, so it is independent of tokenization
+    # def match_basedata(self, regexes, spanlists, verbose=False, ignore_case=False):
+    #     # regexes is a list of (regex, label) tuples, or just regexes, with a group named <m>
+    #     all_results=[]
+    #     string, pos2id, pos2word=self.render_string(spanlists)
+    #     if ignore_case:
+    #         string=string.lower()
 
-        # Look at each reg individually
-        for exp in regexes:
-            if not isinstance(exp, tuple):
-                exp=(exp,'')
+    #     # Look at each reg individually
+    #     for exp in regexes:
+    #         if not isinstance(exp, tuple):
+    #             exp=(exp,'')
 
-            reg=exp[0]
-            label=reg
-            if len(exp)>1:
-                label=exp[1]
+    #         reg=exp[0]
+    #         label=reg
+    #         if len(exp)>1:
+    #             label=exp[1]
 
-            pos=0
-            # Collect lists of span_for_match lists
-            results_for_reg=[]
+    #         pos=0
+    #         # Collect lists of span_for_match lists
+    #         results_for_reg=[]
 
-            for match in re.finditer(reg,string,pos):
-                group="m"
-                start,end=match.span(group)
-                span_for_match=[]
+    #         for match in re.finditer(reg,string,pos):
+    #             group="m"
+    #             start,end=match.span(group)
+    #             span_for_match=[]
 
-                if verbose: print("'%s'"%(match), file=sys.stderr)          
-                for t in range(start,end):
-                    try:
-                        bd_id=pos2id[t]
-                    except KeyError:
-                        # Skip space
-                        continue
-                    if len(span_for_match) == 0 or span_for_match[-1]!=bd_id:
-                        span_for_match.append(bd_id)
-                if len(span_for_match)>0:
-                    results_for_reg.append(([span_for_match],match))
-                pos=end-1
+    #             if verbose: print("'%s'"%(match), file=sys.stderr)          
+    #             for t in range(start,end):
+    #                 try:
+    #                     bd_id=pos2id[t]
+    #                 except KeyError:
+    #                     # Skip space
+    #                     continue
+    #                 if len(span_for_match) == 0 or span_for_match[-1]!=bd_id:
+    #                     span_for_match.append(bd_id)
+    #             if len(span_for_match)>0:
+    #                 results_for_reg.append(([span_for_match],match))
+    #             pos=end-1
 
-            if len(results_for_reg)>0:
-                all_results.append((results_for_reg,reg,label))
-        return all_results
+    #         if len(results_for_reg)>0:
+    #             all_results.append((results_for_reg,reg,label))
+    #     return all_results
 
 
     def add_markablelevel(self, name, namespace=None, scheme="", customization="", create_if_missing=False, encoding='utf-8', dtd_path='"markables.dtd"', at_startup="active"):
@@ -345,17 +346,17 @@ class MMAX2Discourse(object):                       #
         else:
             raise MarkableLevelExistsException(name)
 
-    def render_markables(self, markables, brackets=False, mapping=False, replacements=None):
+    def render_markables(self, markables, brackets=False, mapping=False):
         for_ids=[]
         for n in markables:
             for v in n.get_spanlists():
                 for u in v:
                     for_ids.append(u)
-        return self.render_string(for_ids=[for_ids], brackets=brackets, mapping=mapping, replacements=replacements)
+        return self.render_string(for_ids=[for_ids], brackets=brackets, mapping=mapping)
 
 
-    def render_string(self, for_ids=None, brackets=False, mapping=False, replacements=None):
-        return (self.get_basedata().render_string(for_ids=for_ids, brackets=brackets, mapping=mapping, replacements=replacements))
+    def render_string(self, for_ids=None, markup_level_name="", brackets=False, mapping=False):
+        return (self.get_basedata().render_string_impl(for_ids=for_ids, markup_level_name=markup_level_name, brackets=brackets, mapping=mapping))
 
     def get_basedata(self, bd_type="words"):
         return self.MMAX2_PROJECT.get_basedata(bd_type)
@@ -513,16 +514,33 @@ class MMAX2Discourse(object):                       #
             raise NoMarkablePointerException(pointer_val)
         return mlist
 
-
     def clear_annotations(self):
         for l in self.get_levels():
             l.delete_all_markables()
 
-    def kwic_string_for_elements(self, bd_id_list, width=5, fillwidth=100, lsep="_>>", rsep="<<_", strip=False):
+    def kwic_string_for_elements(self, bd_id_list, markup_level_name, width=5, fillwidth=100, lsep="_>>", rsep="<<_", html=False, strip=False):
+        print("MLN", markup_level_name)
+        basedata = self.get_basedata()
+        pre_bd_tmp, lpadded=basedata.get_preceding_elements(bd_id_list[0], width=width)
+        pre_bd = [a[1] for a in pre_bd_tmp]
+        lc="*B_O_BDATA*"+basedata.render_string_impl([pre_bd], markup_level_name=markup_level_name, disc=self)[0] if lpadded else basedata.render_string_impl([pre_bd], markup_level_name=markup_level_name, disc=self)[0]
+        fol_bd_tmp, rpadded=basedata.get_following_elements(bd_id_list[-1], width=width)
+        fol_bd = [a[1] for a in fol_bd_tmp]
+        rc=basedata.render_string_impl([fol_bd], markup_level_name=markup_level_name, disc=self)[0]+"*E_O_BDATA*" if rpadded else basedata.render_string_impl([fol_bd], markup_level_name=markup_level_name, disc=self)[0]
+        bd_elem_string=basedata.render_string_impl([bd_id_list], markup_level_name=markup_level_name, disc=self, brackets=False, mapping=False, verbose=True)[0]
+#        print("Match:", bd_elem_string)
+        if strip: bd_elem_string=bd_elem_string.strip()
+        if not html:
+            kwic_string = lc.rjust(fillwidth)+lsep+bd_elem_string+rsep+rc
+        else:
+            kwic_string = lc+                 lsep+bd_elem_string+rsep+rc
+        return kwic_string
+
+
+    def kwic_string_for_elements_plain(self, bd_id_list, width=5, fillwidth=100, lsep="_>>", rsep="<<_", html=False, strip=False):
         basedata = self.get_basedata()
         pre_bd_tmp, lpadded=basedata.get_preceding_elements(bd_id_list[0], width=width)
         # Make sure that atts is not None (which is the default for memory economy)
-        # Not too efficient ...
         pre_bd=[]
         for (s,bdid,pos,att) in pre_bd_tmp:
             if att==None:
@@ -548,10 +566,18 @@ class MMAX2Discourse(object):                       #
             rc=" "+rc+ "*E_O_BDATA*"
         else:
             rc=" "+rc
-        bd_elem_string=basedata.render_string([bd_id_list], brackets=False, mapping=False)[0]
+        bd_elem_string=basedata.render_string_impl([bd_id_list], brackets=False, mapping=False)[0]
         if strip: bd_elem_string=bd_elem_string.strip()
-        lc=lc+lsep
-        return lc.rjust(fillwidth)+bd_elem_string+rsep+rc
+        if not html:
+            kwic_string = lc.rjust(fillwidth)+lsep+bd_elem_string+rsep+rc
+        else:
+            kwic_string=lc
+            for i in range(fillwidth-len(lc), fillwidth):
+                if i<0: break
+                kwic_string=kwic_string+"&nbsp;"
+            kwic_string=kwic_string+lsep+bd_elem_string+rsep+rc
+        return kwic_string
+
 
 #################################
 class MMAX2MarkableLevel(object):
@@ -906,6 +932,14 @@ class MMAX2MarkableLevel(object):
                 r.append(m)
         return r
 
+    def get_ended_markables(self, bdid):
+        r=[]
+        for m in self.get_markables_for_basedata(bdid):
+            if m.get_spanlists()[-1][-1]==bdid:
+                r.append(m)
+        return r
+
+
     def delete_all(self):
         return self.remove_all_markables()
 
@@ -1109,7 +1143,9 @@ class MMAX2Markable(object):
         return dist
     
     def match_string(self, regexes, ignore_case=False, precompiled=False, verbose=False):
-        return self.LEVEL.get_discourse().get_basedata().match_string(regexes, for_ids=[flatten_spanlists(self.SPANLISTS)], ignore_case=ignore_case, precompiled=precompiled, verbose=verbose)
+        return self.LEVEL.get_discourse().get_basedata().match_string_impl(regexes, 
+                                                        for_ids=[flatten_spanlists(self.SPANLISTS)], 
+                                                        ignore_case=ignore_case, precompiled=precompiled, verbose=verbose)
 
     # def to_matchable_string_bak(self, main_att, det_atts):
     #     m_text="["+str(self.get_attributes().get(main_att,'NONE')).upper()
@@ -1272,10 +1308,10 @@ class MMAX2Markable(object):
         st=st+'/>'
         return st
 
-    def render_string(self, brackets=False, mapping=False):
+    def render_string(self, markup_level_name="", brackets=False, mapping=False):
         # This renders self as string by passing self.SPANLISTS to basedata rendering.
         # When rendering *discontinuous* markables, brackets should be *required*
-        return (self.LEVEL.get_discourse().get_basedata().render_string(for_ids=self.SPANLISTS, brackets=brackets, mapping=mapping))
+        return (self.LEVEL.get_discourse().get_basedata().render_string_impl(for_ids=self.SPANLISTS, markup_level_name=markup_level_name, brackets=brackets, mapping=mapping))
 
     def get_spanlists(self):
         return self.SPANLISTS
@@ -1571,6 +1607,7 @@ class Basedata(object):
         self.DCELEMENTS=list()
         self.TAGS={}
         self.BDID2LISTPOS={}
+        #self.DISCOURSE=disc
 
         # Set encoding from supplied file
         if os.path.exists(self.FILENAME):
@@ -1709,9 +1746,7 @@ class Basedata(object):
         return bd_ids
 
 
-
-
-    def render_string(self, for_ids=None, brackets=False, mapping=False, replacements=None):
+    def render_string_impl(self, for_ids=None, markup_level_name="", disc=None, brackets=False, mapping=False, verbose=False):
         m_string=""
         pos2id={}
         last_pos=0
@@ -1723,16 +1758,79 @@ class Basedata(object):
                 for_ids[0].append(bdid)
 
         if not brackets and len(for_ids)>1:
-            # print("Forcing brackets for discontinuous markable!")
             brackets=True
+
+        markup_level=None
+        if disc and markup_level_name!="":
+            markup_level=disc.get_level(markup_level_name)
 
         for spanlist in for_ids:
             for sid, bd_id in enumerate(spanlist):
                 te=self.get_element_text(bd_id)
+                if markup_level:
+                    started_markup = markup_level.get_started_markables(bd_id)
+                    ended_markup   = markup_level.get_ended_markables(bd_id)
+                    if verbose: 
+                        print("Started:",started_markup)
+                        print("Ended:",ended_markup)
 
-                if replacements is not None:
-                    for bf,af in replacements:
-                        te=te.replace(bf,af)
+                    mkup = [a for a in ended_markup if a.get_attributes().get('sup','false')=='true']
+                    if verbose: print(mkup)
+                    if len(mkup)>0: te=te+"</sup>"
+
+                    mkup = [a for a in ended_markup if a.get_attributes().get('sub','false')=='true']
+                    if verbose: print(mkup)
+                    if len(mkup)>0: te=te+"</sub>"
+
+                    mkup = [a for a in started_markup if a.get_attributes().get('sup','false')=='true']
+                    if verbose: print(mkup)
+                    if len(mkup)>0: te="<sup>"+te
+
+                    mkup = [a for a in started_markup if a.get_attributes().get('sub','false')=='true']
+                    if verbose: print(mkup)
+                    if len(mkup)>0: te="<sub>"+te
+
+                atts=self.get_element_attributes(bd_id)
+                if not atts:    l_spaces=1
+                else:           l_spaces=int(atts.get('spc','1'))# Default 1 is correct because one space is the default
+                # Create pad
+                pad=" "*l_spaces
+                last_pos=len(m_string)+l_spaces
+                # Add spaces *before* te
+                m_string=m_string+pad+te
+                if mapping:
+                    # Create mapping of char positions covered by te to bd_id
+                    for i in range(last_pos, last_pos+len(te)):
+                        pos2id[i]=bd_id
+                words.append(te)
+                ids.append(bd_id)
+            if verbose: print("Rendered:", m_string)
+            m_string="["+m_string+"]" if brackets else m_string
+            m_string=m_string+".."
+        return m_string[:-2], words, ids, pos2id
+
+
+    def render_string_impl_bak(self, for_ids=None, markup_level_name="", brackets=False, mapping=False):
+        m_string=""
+        pos2id={}
+        last_pos=0
+        words, ids=[],[]
+        # for_ids == None means all basedata elements, which will always be continuous
+        if not for_ids:
+            for_ids=[[]]
+            for _, bdid, _, _ in self.DCELEMENTS:   
+                for_ids[0].append(bdid)
+
+        if not brackets and len(for_ids)>1:
+            brackets=True
+
+        markup_level=None
+        if self.DISCOURSE and markup_level_name!="":
+            markup_level=disc.get_level(markup_level_name)
+
+        for spanlist in for_ids:
+            for sid, bd_id in enumerate(spanlist):
+                te=self.get_element_text(bd_id)
 
                 atts=self.get_element_attributes(bd_id)
                 if not atts:
@@ -1849,10 +1947,10 @@ class Basedata(object):
         return bd_id
 
     # This matches cross-basedata, so it is independent of tokenization
-    def match_string(self, regexes, for_ids=None, ignore_case=False, precompiled=False, verbose=False):
+    def match_string_impl(self, regexes, for_ids=None, ignore_case=False, precompiled=False, group="m", verbose=False):
         # regexes is a list of (regex, label, pt) tuples, where label is optional
         all_results=[]
-        string, words, _, pos2id=self.render_string(for_ids=for_ids, mapping=True)
+        string, words, _, pos2id=self.render_string_impl(for_ids=for_ids, mapping=True)
         # Look at each reg individually
         for exp in regexes:
             pt=False
@@ -1868,15 +1966,19 @@ class Basedata(object):
             pos=0
             # Collect lists of span_for_match lists
             results_for_reg=[]
-#            print(reg)
             if not precompiled:
                 trem = re.finditer(reg,string,pos)
             else:
                 trem=reg.finditer(string, pos)
             for match in trem:
                 # None or one capturing group only
-                group="m"
-                start, end=match.span(group)
+                #group="m"
+#                print("Group:"+str(group))
+                if group:
+                    start, end=match.span(group)
+                else:
+                    start, end=match.span()
+
                 span_for_match=[]
                 if verbose: print("'%s'"%(match), file=sys.stderr)          
                 for t in range(start, end):
@@ -1977,10 +2079,6 @@ class Basedata(object):
                 break
         return r
 
-    # def get_preceeding_elements(self, bd_id, width=10):
-    #     print("Deprecated! Use get_preceding_elements(bd_id, width=width)!")
-    #     return self.get_preceding_elements(bd_id, width=width)
-
     def get_preceding_elements(self, bd_id, width=10):
         for (pos,i) in enumerate(self.DCELEMENTS):
             if i[1]==bd_id:
@@ -2002,12 +2100,6 @@ class Basedata(object):
             width=len(self.DCELEMENTS)
             pad=True
         return(self.DCELEMENTS[start_pos:start_pos+width], pad)
-
-    # candidates can be either markable objects or basedata IDs
-#   def merge_spanlists(self, candidates):
-#       for c in candidates:
-#           print(l)
-
 
 # Static helper methods
 #############################################
@@ -2055,106 +2147,6 @@ class PhraseAnnotator(object):
                     spanlist=[bd[1] for bd in bdata.DCELEMENTS[o:ngram]]
                     targetlevel.add_markable([spanlist], attribs)           
 
-
-
-# def kwic_string_for_elements(bd_id_list, basedata, width=5, fillwidth=100, lsep="_>>", rsep="<<_", strip=False):
-#     pre_bd_tmp, lpadded=basedata.get_preceeding_elements(bd_id_list[0], width=width)
-#     # Make sure that atts is not None (which is the default for memory economy)
-#     # Not too efficient ...
-#     pre_bd=[]
-#     for (s,bdid,pos,att) in pre_bd_tmp:
-#         if att==None:
-#             att={}
-#         pre_bd.append((s,bdid,pos,att))
-
-#     fol_bd_tmp, rpadded=basedata.get_following_elements(bd_id_list[-1], width=width)
-#     fol_bd=[]
-#     for (s,bdid,pos,att) in fol_bd_tmp:
-#         if att==None:
-#             att={}
-#         fol_bd.append((s,bdid,pos,att))
-
-#     lc,rc="",""
-
-#     if lpadded: lc="*B_O_BDATA*"
-#     for text,spc in [(t[0], int(t[3].get('spc','1'))) for t in pre_bd]:
-#         lc=lc+(" "*spc)+text
-#     for text,spc in [(t[0], int(t[3].get('spc','1'))) for t in fol_bd]:
-#         rc=rc+(" "*spc)+text
-
-#     if rpadded:
-#         rc=" "+rc+ "*E_O_BDATA*"
-#     else:
-#         rc=" "+rc
-#     bd_elem_string=basedata.render_string([bd_id_list], brackets=False, mapping=False)[0]
-#     if strip: bd_elem_string=bd_elem_string.strip()
-#     lc=lc+lsep
-#     return lc.rjust(fillwidth)+bd_elem_string+rsep+rc
-
-
-
-# # This matches cross-basedata, so it is independent of tokenization
-# def match_basedata_bak(regexes, spanlists, ignore_case=False, verbose=False):
-#     # regexes is a list of (regex, label, sample) tuples, label is optional
-#     all_results=[]
-
-# #   testing=False
-# #   if teststring != None:
-# #       string=teststring
-# #       testing=True
-# #       verbose=True
-
-# #   if not testing:
-#     string, pos2id, pos2word=render_string(spanlists)
-# #   else:
-# #       pos2id={}
-# #       pos2word={}
-#     if ignore_case:
-#         string=string.lower()
-
-#     # Look at each reg individually
-#     for exp in regexes:
-#         reg=exp[0]
-#         label=reg
-#         if len(exp)>1:
-#             label=exp[1]
-
-#         if testing:
-#             print("\n"+reg)
-#             print("\n"+string)
-
-#         pos=0
-#         # Collect lists of span_for_match lists
-#         results_for_reg=[]
-
-#         for match in re.finditer(reg,string,pos):
-#             # None or one capturing group only
-# #           group=0 if not match.groups() else 1
-# #           if verbose: print(match.span(group))
-#             group="m"
-
-#             start,end=match.span(group)
-#             span_for_match=[]
-
-#             if verbose: print("'%s'"%(match), file=sys.stderr)          
-#             for t in range(start,end):
-#                 try:
-#                     bd_id=pos2id[t]
-#                 except KeyError:
-#                     # Skip space
-#                     continue
-#                 if len(span_for_match) == 0 or span_for_match[-1]!=bd_id:
-#                     span_for_match.append(bd_id)
-#             if len(span_for_match)>0:
-#                 results_for_reg.append(([span_for_match],match))
-#             pos=end-1
-
-#         if len(results_for_reg)>0:
-#             all_results.append((results_for_reg,reg,label))
-#     return all_results
-
-
-
 # spanlists is a list with one list per segment
 # This should only be necessary when serializing a markable to xml
 def spanlists_to_span(spanlists):
@@ -2167,29 +2159,7 @@ def spanlists_to_span(spanlists):
             span=span+","
     return span[:-1]
 
-
-# # This handles discontinues markables correctly
-# def span_to_spanlists(span, basedata):
-#   spanlists=[]
-#   # Discont markables have more than one segment
-#   for seg in span.split(","):
-#       spanlist=[]
-#       if re.match(r'word\_[0-9]+\.\.word\_[0-9]+', seg):
-# #         print(seg)
-#           spanlist=basedata.interpolate_span(seg.split("..")[0],seg.split("..")[1])
-#       elif re.match(r'word\_[0-9]+', seg):
-#           spanlist=[seg]
-#       else:
-#           #print("No span")
-#           raise NoSpanException(span)
-#       spanlists.append(spanlist)
-#   return spanlists
-
-
 def span_overlap(full_span1, full_span2):
-#   full_span1=span_to_spanlists(span1, basedata)
-#   full_span2=span_to_spanlists(span2, basedata)
-
     if set(flatten_spanlists(full_span1)).intersection(set(flatten_spanlists(full_span2))) != {}:
         return True
     return False
