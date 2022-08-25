@@ -518,8 +518,8 @@ class MMAX2Discourse(object):                       #
         for l in self.get_levels():
             l.delete_all_markables()
 
-    def kwic_string_for_elements(self, bd_id_list, markup_level_name, width=5, fillwidth=100, lsep="_>>", rsep="<<_", html=False, strip=False):
-        print("MLN", markup_level_name)
+    def kwic_string_for_elements(self, bd_id_list, markup_level_name, width=5, fillwidth=100, lsep="_>>", rsep="<<_", html=False, strip=False, verbose=False):
+        # print("MLN", markup_level_name)
         basedata = self.get_basedata()
         pre_bd_tmp, lpadded=basedata.get_preceding_elements(bd_id_list[0], width=width)
         pre_bd = [a[1] for a in pre_bd_tmp]
@@ -527,7 +527,7 @@ class MMAX2Discourse(object):                       #
         fol_bd_tmp, rpadded=basedata.get_following_elements(bd_id_list[-1], width=width)
         fol_bd = [a[1] for a in fol_bd_tmp]
         rc=basedata.render_string_impl([fol_bd], markup_level_name=markup_level_name, disc=self)[0]+"*E_O_BDATA*" if rpadded else basedata.render_string_impl([fol_bd], markup_level_name=markup_level_name, disc=self)[0]
-        bd_elem_string=basedata.render_string_impl([bd_id_list], markup_level_name=markup_level_name, disc=self, brackets=False, mapping=False, verbose=True)[0]
+        bd_elem_string=basedata.render_string_impl([bd_id_list], markup_level_name=markup_level_name, disc=self, brackets=False, mapping=False, verbose=verbose)[0]
 #        print("Match:", bd_elem_string)
         if strip: bd_elem_string=bd_elem_string.strip()
         if not html:
