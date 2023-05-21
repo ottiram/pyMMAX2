@@ -476,16 +476,18 @@ class MMAX2Discourse(object):                       #
         return spanlists
 
     # This handles discontinues markables correctly
+    # This is also robust against non-monotonous spans, since it uses interpolate_span, and not just number id extraction.
     def span_to_spanlists(self, span):
         spanlists=[]
-        # Discont markables have more than one segment
+        # Discont markables have more than one fragment
         for seg in span.split(","):
             spanlist=[]
             if seg=="":
                 raise NoMarkableSpanException(seg)
-            if re.match(r'word\_[0-9]+\.\.word\_[0-9]+', seg):
+            # Mod: Allow . in numeric id parts to support tokens with float ids
+            if re.match(r'word\_[0-9.]+\.\.word\_[0-9.]+', seg):
                 spanlist=self.get_basedata().interpolate_span(seg.split("..")[0],seg.split("..")[1])
-            elif re.match(r'word\_[0-9]+', seg):
+            elif re.match(r'word\_[0-9.]+', seg):
                 spanlist=[seg]
             else:
                 raise NoMarkableSpanException(span)
@@ -493,12 +495,15 @@ class MMAX2Discourse(object):                       #
         return spanlists
 
 
+    def get_pointer_targets(self, pointer_val, source_level):
+        return self.pointers_to_markables(pointer_val, source_level)
+
     # Missing markables are replaced by strings in the result list
     def pointers_to_markables(self, pointer_val, source_level):
         mlist=[]
         # Several markables as pointer targets are separated by ;
         for m in pointer_val.split(";"):            
-            p = m.split(":")
+            p = list(map(str,m.split(":")))
             if p[-1].startswith("markable_"):
                 if len(p)>1:
                     try:
@@ -640,6 +645,10 @@ class MMAX2MarkableLevel(object):
             if verbose: print(f'{Fore.MAGENTA}{Style.BRIGHT}'+str(tmp_lev)+f'{Style.RESET_ALL}', file=sys.stderr)
             self.J_MMAX2ATTRIBUTEPANEL = tmp_lev.getCurrentAnnotationScheme().getCurrentAttributePanel()
             self.J_MMAX2ATTRIBUTEPANEL.setAttributePanelContainer(self.DISCOURSE.get_mmax2_java_binding().JClass('org.eml.MMAX2.gui.windows.MMAX2AttributePanelContainer')())
+
+    def __repr__(self):
+        return "MarkableLevel of discourse "+self.DISCOURSE.MMAX2_PROJECT.FILE+" " +self.NAME+" with "+str(len(self.MARKABLES))+" markables."
+
 
     def get_J_MMAX2ANNOTATIONSCHEME(self):
         return self.DISCOURSE.get_J_MMAX2DISCOURSE().getMarkableLevelByName(self.NAME,False).getCurrentAnnotationScheme()
@@ -901,9 +910,12 @@ class MMAX2MarkableLevel(object):
                     attrs=m.attrs.copy()
                     if self.get_J_MMAX2ATTRIBUTEPANEL():
                         self.normalize_attributes(attrs)
-
-                    # This is a meta attribute not stored in the attributes dict
-                    attrs.pop('mmax_level')
+                    try:
+                        # This is a meta attribute not stored in the attributes dict
+                        # It might be missing if the markables were created outside MMAX2, but will be added upon the next save
+                        attrs.pop('mmax_level')
+                    except KeyError:
+                        pass
                     # Dito.
                     # Expand short span from xml file *once*, and assign at markable creation
                     spanlists=self.get_discourse().span_to_spanlists(attrs.pop('span'))
@@ -1257,6 +1269,9 @@ class MMAX2Markable(object):
         self.ATTRIBUTES = ea
         if validation_errors and raise_exception:
             raise InvalidMMAX2AttributeException(self.LEVEL.get_name(), self.ID, supplied, valid, invalid, missing)
+
+    def validate(self):
+        self.update_attributes(self.ATTRIBUTES)
 
     def remove_attribute(self, attname, validate=False):
         del self.ATTRIBUTES[attname]
@@ -1638,7 +1653,8 @@ class Basedata(object):
 
         # Set encoding from supplied file
         if os.path.exists(self.FILENAME):
-            with open(self.FILENAME,"r") as win:
+            # Changed from r to rb
+            with open(self.FILENAME,"rb") as win:
                 raw=win.read()
                 self.ENCODING = EncodingDetector.find_declared_encoding(raw, is_html=False)
                 soup = bs(raw, 'lxml')              
@@ -1647,7 +1663,7 @@ class Basedata(object):
                 atts=None
                 for att in w.attrs:
                     if att!="id":
-                        # Create bd-level attributes only if needed
+                        # Create bd-level attributes only if needed, i.e. if non-id-attributes are present
                         if not atts:
                             atts = {}
                         atts[att]=w.attrs[att]
@@ -1662,7 +1678,7 @@ class Basedata(object):
             yield self.DCELEMENTS[i:i+n]
 
     # Returns bd_id span    
-    def add_elements_from_string(self, uc_string, isolate_numbers=False, force_no_leading_space=False, verbose=False):
+    def add_elements_from_string(self, uc_string, isolate_numbers=False, force_no_leading_space=False, split_on_char_level=False, verbose=False):
         if verbose: print("\n", uc_string)
         bd_ids=[]
         w=""
@@ -1671,7 +1687,7 @@ class Basedata(object):
         # Get current char
         for i in uc_string:
             # if verbose: print("\t", i, unicodedata.category(i))
-            if unicodedata.category(i) in ['Sc', 'Sm', 'So', 'Zl','Zp', 'Zs', 'Pc', 'Pd','Pe', 'Pf', 'Pi', 'Po', 'Ps', 'Cf', 'Cc']:
+            if split_on_char_level or unicodedata.category(i) in ['Sc', 'Sm', 'So', 'Zl','Zp', 'Zs', 'Pc', 'Pd','Pe', 'Pf', 'Pi', 'Po', 'Ps', 'Cf', 'Cc']:
                 # Current char is a saveable separator OR a space
                 # Save current token *before* separator, if any
                 if w != "":
@@ -1965,8 +1981,25 @@ class Basedata(object):
         return m_string, pos2id
 
 
+   # Returns bd_id
+    def add_element(self, bd_text, bd_attribs=None, with_id="", at_position=-1):
+        
+        # Find next free bd_id
+        bd_id = with_id if with_id != "" else self.BDTYPE+"_"+str(len(self.DCELEMENTS))
+        # text, id, pos, attributes
+        if at_position == -1:
+            self.DCELEMENTS.append((bd_text, bd_id, len(self.DCELEMENTS), bd_attribs))
+            # New bd gets bdidlistpos at the end
+            self.BDID2LISTPOS[bd_id]=len(self.DCELEMENTS)-1     
+        else:
+            self.DCELEMENTS.insert(at_position, (bd_text, bd_id, at_position, bd_attribs))
+            self.BDID2LISTPOS[bd_id]=at_position
+        return bd_id
+
+
+
     # Returns bd_id
-    def add_element(self, bd_text, bd_attribs=None):
+    def add_element_bak(self, bd_text, bd_attribs=None):
         bd_id=self.BDTYPE+"_"+str(len(self.DCELEMENTS))
         # text, id, pos, attributes
         self.DCELEMENTS.append((bd_text, bd_id, len(self.DCELEMENTS), bd_attribs))
@@ -2039,6 +2072,19 @@ class Basedata(object):
 
     def get_element(self, bd_id):
         return self.DCELEMENTS[self.BDID2LISTPOS[bd_id]]
+
+    def update_element(self, bd_id, new_string=None, new_atts=None):
+        string,_,pos,atts=self.DCELEMENTS[self.BDID2LISTPOS[bd_id]]
+        if new_string: string=new_string
+        if new_atts: atts=new_atts
+        self.DCELEMENTS[self.BDID2LISTPOS[bd_id]]=(string,bd_id,pos,atts)
+
+
+#    def set_element_string(self, bd_id, newstring):
+#        #return self.DCELEMENTS[self.BDID2LISTPOS[bd_id]][0]
+#        bdid,oldstring,pos,atts=self.DCELEMENTS[self.BDID2LISTPOS[bd_id]]
+#        self.DCELEMENTS[self.BDID2LISTPOS[bd_id]]=(bdid,newstring,pos,atts)
+
 
     def get_element_string(self, bd_id):
         return self.DCELEMENTS[self.BDID2LISTPOS[bd_id]][0]
@@ -2267,7 +2313,7 @@ class NoMarkableSpanException(Exception):
 
 class NoMarkablePointerException(Exception):
     def __init__(self, pointer):
-        super().__init__("String '"+pointer+"' is not a markable pointer!")
+        super().__init__("String '"+str(pointer)+"' is not a markable pointer!")
 
 class MMAX2FileNotFoundException(Exception):
     def __init__(self, filename):
