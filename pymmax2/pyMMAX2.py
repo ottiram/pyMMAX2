@@ -3,7 +3,7 @@ import sys, os, codecs, pkg_resources, colorama, binascii, time
 from bs4 import BeautifulSoup as bs
 from bs4.dammit import EncodingDetector
 
-from xml.sax.saxutils import escape
+from xml.sax.saxutils import escape 
 from colorama import Fore, Back, Style
 import unicodedata
 from collections import OrderedDict
@@ -518,26 +518,26 @@ class MMAX2Discourse(object):                       #
         for l in self.get_levels():
             l.delete_all_markables()
 
-    def kwic_string_for_elements(self, bd_id_list, markup_level_name, width=5, fillwidth=100, lsep="_>>", rsep="<<_", html=False, strip=False, verbose=False):
-        # print("MLN", markup_level_name)
-        basedata = self.get_basedata()
-        pre_bd_tmp, lpadded=basedata.get_preceding_elements(bd_id_list[0], width=width)
-        pre_bd = [a[1] for a in pre_bd_tmp]
-        lc="*B_O_BDATA*"+basedata.render_string_impl([pre_bd], markup_level_name=markup_level_name, disc=self)[0] if lpadded else basedata.render_string_impl([pre_bd], markup_level_name=markup_level_name, disc=self)[0]
-        fol_bd_tmp, rpadded=basedata.get_following_elements(bd_id_list[-1], width=width)
-        fol_bd = [a[1] for a in fol_bd_tmp]
-        rc=basedata.render_string_impl([fol_bd], markup_level_name=markup_level_name, disc=self)[0]+"*E_O_BDATA*" if rpadded else basedata.render_string_impl([fol_bd], markup_level_name=markup_level_name, disc=self)[0]
-        bd_elem_string=basedata.render_string_impl([bd_id_list], markup_level_name=markup_level_name, disc=self, brackets=False, mapping=False, verbose=verbose)[0]
+#    def kwic_string_for_elements(self, bd_id_list, markup_level_name, width=5, fillwidth=100, lsep="_>>", rsep="<<_", html=False, strip=False, verbose=False):
+#        # print("MLN", markup_level_name)
+#        basedata = self.get_basedata()
+#        pre_bd_tmp, lpadded=basedata.get_preceding_elements(bd_id_list[0], width=width)
+#        pre_bd = [a[1] for a in pre_bd_tmp]
+#        lc="*B_O_BDATA*"+basedata.render_string_impl([pre_bd], markup_level_name=markup_level_name, disc=self)[0] if lpadded else basedata.render_string_impl([pre_bd], markup_level_name=markup_level_name, disc=self)[0]
+#        fol_bd_tmp, rpadded=basedata.get_following_elements(bd_id_list[-1], width=width)
+#        fol_bd = [a[1] for a in fol_bd_tmp]
+#        rc=basedata.render_string_impl([fol_bd], markup_level_name=markup_level_name, disc=self)[0]+"*E_O_BDATA*" if rpadded else basedata.render_string_impl([fol_bd], markup_level_name=markup_level_name, disc=self)[0]
+#        bd_elem_string=basedata.render_string_impl([bd_id_list], markup_level_name=markup_level_name, disc=self, brackets=False, mapping=False, verbose=verbose)[0]
 #        print("Match:", bd_elem_string)
-        if strip: bd_elem_string=bd_elem_string.strip()
-        if not html:
-            kwic_string = lc.rjust(fillwidth)+lsep+bd_elem_string+rsep+rc
-        else:
-            kwic_string = lc+                 lsep+bd_elem_string+rsep+rc
-        return kwic_string
+#        if strip: bd_elem_string=bd_elem_string.strip()
+#        if not html:
+#            kwic_string = lc.rjust(fillwidth)+lsep+bd_elem_string+rsep+rc
+#        else:
+#            kwic_string = lc+                 lsep+bd_elem_string+rsep+rc
+#        return kwic_string
 
 
-    def kwic_string_for_elements_plain(self, bd_id_list, width=5, fillwidth=100, lsep="_>>", rsep="<<_", html=False, strip=False):
+    def kwic_string_for_elements(self, bd_id_list, width=5, fillwidth=100, lsep="_>>", rsep="<<_", html=False, strip=False, markup_level=None, markup_color=""):
         basedata = self.get_basedata()
         pre_bd_tmp, lpadded=basedata.get_preceding_elements(bd_id_list[0], width=width)
         # Make sure that atts is not None (which is the default for memory economy)
@@ -557,25 +557,52 @@ class MMAX2Discourse(object):                       #
         lc,rc="",""
 
         if lpadded: lc="*B_O_BDATA*"
-        for text,spc in [(t[0], int(t[3].get('spc','1'))) for t in pre_bd]:
-            lc=lc+(" "*spc)+text
-        for text,spc in [(t[0], int(t[3].get('spc','1'))) for t in fol_bd]:
-            rc=rc+(" "*spc)+text
+        for text, spc, bdid in [(t[0], int(t[3].get('spc','1')),t[1]) for t in pre_bd]:
+            starts_markable, ends_markable = False,False
+            if markup_level!=None and len(markup_level.get_started_markables(bdid))>0:
+                starts_markable=True
+            if markup_level!=None and len(markup_level.get_ended_markables(bdid))>0:
+                ends_markable=True
+            if html and starts_markable:
+                lc=lc+(" "*spc)+"["+text
+            else:
+                lc=lc+(" "*spc)+text
+            if html and ends_markable:
+                lc=lc+"]"
+
+
+        for text, spc, bdid in [(t[0], int(t[3].get('spc','1')), t[1]) for t in fol_bd]:
+            starts_markable, ends_markable = False,False
+            if markup_level!=None and len(markup_level.get_started_markables(bdid))>0:
+                starts_markable=True
+            if markup_level!=None and len(markup_level.get_ended_markables(bdid))>0:
+                ends_markable=True
+            if html and starts_markable:
+                rc=rc+(" "*spc)+"["+text
+            else:
+                rc=rc+(" "*spc)+text
+            if html and ends_markable:
+                rc=rc+"]"
 
         if rpadded:
             rc=" "+rc+ "*E_O_BDATA*"
         else:
             rc=" "+rc
-        bd_elem_string=basedata.render_string_impl([bd_id_list], brackets=False, mapping=False)[0]
-        if strip: bd_elem_string=bd_elem_string.strip()
-        if not html:
-            kwic_string = lc.rjust(fillwidth)+lsep+bd_elem_string+rsep+rc
-        else:
-            kwic_string=lc
-            for i in range(fillwidth-len(lc), fillwidth):
-                if i<0: break
-                kwic_string=kwic_string+"&nbsp;"
-            kwic_string=kwic_string+lsep+bd_elem_string+rsep+rc
+        # One space exactly at start of rc
+        rc=" "+rc.lstrip()
+
+        match_string=basedata.render_string_impl([bd_id_list], brackets=False, mapping=False)[0]
+        if markup_level!=None and len(markup_level.get_started_markables(bd_id_list[0]))>0:
+            match_string="["+match_string.strip()
+        if markup_level!=None and len(markup_level.get_ended_markables(bd_id_list[-1]))>0:
+            match_string=match_string+"]"
+ 
+        if match_string.startswith(" ")==False:   # Make sure key words are always padded with a leading space, even if spc=0
+            match_string=" "+match_string
+                   
+        if strip: 
+            match_string=match_string.strip()
+        kwic_string = lc.rjust(fillwidth)+lsep+match_string+rsep+rc
         return kwic_string
 
 
@@ -1951,6 +1978,7 @@ class Basedata(object):
         # regexes is a list of (regex, label, pt) tuples, where label is optional
         all_results=[]
         string, words, _, pos2id=self.render_string_impl(for_ids=for_ids, mapping=True)
+        # print(string)
         # Look at each reg individually
         for exp in regexes:
             pt=False
@@ -1972,8 +2000,8 @@ class Basedata(object):
                 trem=reg.finditer(string, pos)
             for match in trem:
                 # None or one capturing group only
-                #group="m"
-#                print("Group:"+str(group))
+                group="m"
+                # print("Group:"+str(group))
                 if group:
                     start, end=match.span(group)
                 else:
@@ -2108,44 +2136,55 @@ class Basedata(object):
 ##############################
 class PhraseAnnotator(object):
 ##############################  
-    def __init__ (self, phrasefile, ignore_case=True):
+    def __init__ (self, phraselist, ignore_case=True):
         self.PHRASES=set()
         self.IGNORE_CASE=ignore_case
         self.MAX_LEN=0
 
-        with open(phrasefile) as pin:
-            for p in pin:
-                p=p.strip()
-                if p!="":
-                    if len(p.split(" "))>self.MAX_LEN:  
-                        self.MAX_LEN=len(p.split(" "))
-                    if self.IGNORE_CASE:    
-                        p=p.lower()
-                    self.PHRASES.add(p)
+#        with open(phrasefile) as pin:
+        for p in phraselist:
+            p=p.strip()
+            if p!="":
+                plen=len(Basedata('dummy.xml').add_elements_from_string(p, isolate_numbers=False))
+                #if len(p.split(" "))>self.MAX_LEN:
+                if plen>self.MAX_LEN:
+                    self.MAX_LEN=plen
+                if self.IGNORE_CASE:    
+                    p=p.lower()
+                self.PHRASES.add(p)
         print("PhraseAnnotator loaded",len(self.PHRASES),"phrases, ignore_case",self.IGNORE_CASE, "max phrase length",self.MAX_LEN)
 
-    def apply(self, bdata, targetlevel, attribs, verbose=False):
-        elems=len(bdata.DCELEMENTS)
+    def apply(self, discourse, targetlevel_name, allow_overlap=False, verbose=False):
+        elems=len(discourse.get_basedata().DCELEMENTS)
         # Move through tokens from left to right. There should be *one* o pass only
         for o in range(elems):
-            elems=len(bdata.DCELEMENTS)
+            elems=len(discourse.get_basedata().DCELEMENTS)
             # Move through tokens from right to left, start at o+MAX_LEN (no phrase will be longer)
             for n in range(self.MAX_LEN+o,o,-1):    # o instead of o-1 will also find single-token phrases
                 if n > elems: 
                     n=elems
                     elems-=1
-                ngram=""
-                for t in range(o,n):
-                    print(t)
-                    ngram=ngram+" "+bdata.DCELEMENTS[t][0]
-                    ngram=ngram.strip()
+                # Create potential ngrams from longer to shorter ones
+                ngram_span=[f[1] for f in discourse.get_basedata().DCELEMENTS[o:n]]
+                ngram = discourse.render_string(for_ids=[ngram_span])[0].strip()
                 if self.IGNORE_CASE:
                     ngram=ngram.lower()
                 if ngram in self.PHRASES:
+                    overlap=False
+                    if allow_overlap==False:
+                        # Check if the found ngram is embedded / overlapping with an already existing one on the same level
+                        for spid in ngram_span:
+                            if len(discourse.get_level(targetlevel_name).get_markables_for_bd(spid))>0:
+                                overlap=True
+                                break # leave search for overlapping markable
+                        if overlap:
+                            print("Overlap "+ngram)
+                            continue # Continue with next potential phrase
                     if verbose: 
                         print("Found phrase '%s' from %s to %s"%(ngram,str(o), str(n-1)))
-                    spanlist=[bd[1] for bd in bdata.DCELEMENTS[o:ngram]]
-                    targetlevel.add_markable([spanlist], attribs)           
+                    spanlist=[bd[1] for bd in discourse.get_basedata().DCELEMENTS[o:n]]
+                    # Todo: set some attributes here
+                    discourse.get_level(targetlevel_name).add_markable([spanlist])           
 
 # spanlists is a list with one list per segment
 # This should only be necessary when serializing a markable to xml
