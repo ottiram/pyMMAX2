@@ -72,7 +72,7 @@ def create_mmax2_stub(mmax2_name, mmax2_base_path, clear_basedata=False, clear_l
             if verbose: print("Removing ...", file=sys.stderr)
             os.remove(words_filename)
     if create_basedata_stub and not os.path.exists(words_filename):
-        with open(words_filename,'w') as mout:
+        with open(words_filename,'w', encoding="utf-8") as mout:
             mout.write(BASEDATA_STUB)
 
 
