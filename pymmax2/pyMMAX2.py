@@ -1,5 +1,10 @@
 import sys, os, codecs, pkg_resources, colorama, binascii, time
 
+from bs4.builder import XMLParsedAsHTMLWarning
+import warnings
+warnings.filterwarnings('ignore', category=XMLParsedAsHTMLWarning)
+
+
 from bs4 import BeautifulSoup as bs
 from bs4.dammit import EncodingDetector
 
@@ -10,10 +15,10 @@ from collections import OrderedDict
 import regex as re
 from operator import itemgetter
 
-try:
-    from Bio import pairwise2
-except ImportError:
-    print("BioPython not found. Aligning will not work!")
+#try:
+#    from Bio import pairwise2
+#except ImportError:
+#    print("BioPython not found. Aligning will not work!")
 
 colorama.init()
 
@@ -72,7 +77,7 @@ def create_mmax2_stub(mmax2_name, mmax2_base_path, clear_basedata=False, clear_l
             if verbose: print("Removing ...", file=sys.stderr)
             os.remove(words_filename)
     if create_basedata_stub and not os.path.exists(words_filename):
-        with open(words_filename,'w', encoding="utf-8") as mout:
+        with codecs.open(words_filename,'w', encoding="UTF-8") as mout:
             mout.write(BASEDATA_STUB)
 
 
@@ -87,13 +92,13 @@ def create_mmax2_stub(mmax2_name, mmax2_base_path, clear_basedata=False, clear_l
                 if verbose: print("Removing ...", file=sys.stderr)
                 os.remove(mmax2_base_path + cp.get_markable_path() + m_file)
         if create_level_stubs and not os.path.exists(mmax2_base_path + cp.get_markable_path() + m_file):
-            with open(mmax2_base_path + cp.get_markable_path() + m_file,'w') as mout:
+            with codecs.open(mmax2_base_path + cp.get_markable_path() + m_file,'w', encoding="UTF-8") as mout:
                 mout.write(LEVEL_STUB.replace("__LEVELNAME__",l.get_name()))
 
     mmax2_proj_name=mmax2_base_path+mmax2_name+".mmax"
     #if not os.path.exists(mmax2_proj_name):
     # Touch .mmax file to update its creation date
-    with open(mmax2_proj_name,'w') as mmax_out:
+    with codecs.open(mmax2_proj_name,'w', encoding="UTF-8") as mmax_out:
         mmax_out.write('<?xml version="1.0" encoding="UTF-8"?>\n<mmax_project>\n<words>'+mmax2_name+'_words.xml</words>\n<keyactions></keyactions>\n<gestures></gestures>\n</mmax_project>')
 
     return mmax2_proj_name
@@ -159,6 +164,11 @@ class MMAX2Discourse(object):                       #
         else:
             if verbose: print("\tLoaded "+str(bd_size)+" basedata elements", file=sys.stderr)
         self.COMMONPATHS   = cp 
+
+
+    def __repr__(self):
+        return self.info(mono=True)
+
 
     # De-coupling the loading of markables (which always includes validation) 
     # from MMAX2Discourse creation is required to allow the creation of a MMAX2Discourse
@@ -242,28 +252,28 @@ class MMAX2Discourse(object):                       #
                 res=res+" "+i.get_name().ljust(16)+" : "+str(len(i.get_all_markables())).rjust(5) +" markables [DEFAULT: "+def_att_string+"]\n"
         return res
 
-    def info_(self):
-        res=""
-        print("\nMMAX2 Project Info:")
-        print("-------------------")
-        print(".mmax file        :", f'{Fore.BLUE}'+str(self.MMAX2_PROJECT.get_mmax2_path(full=True))+f'{Style.RESET_ALL}')
-        print("Basedata elements :", f'{Fore.BLUE}'+str(self.get_bd_count())+f'{Style.RESET_ALL}')
-        print("Markable levels   :")
-        for i in self.COMMONPATHS.MARKABLELEVELS:
-            def_att_string="Annotation scheme instance not available!"
-            default_attrib_list, _ = i.get_default_attributes()
-            if default_attrib_list != None:
-                def_att_string=""
-                for t,a,v,b in default_attrib_list:
-                    # Mark branching attributes 
-                    if b:
-                        a="<>"+str(a)
-                    def_att_string=def_att_string+str(a)+":"+str(v)+", "
-                if def_att_string!="":
-                    def_att_string=def_att_string[0:-2]
-                else:
-                    def_att_string="none defined"
-            print(" "+i.get_name().ljust(16)+" : "+f'{Fore.BLUE}'+ str(len(i.get_all_markables())).rjust(5)  +f'{Style.RESET_ALL}'+" markables [DEFAULT: "+f'{Fore.BLUE}'+def_att_string+f'{Style.RESET_ALL}]')
+    # def info_(self):
+    #     res=""
+    #     print("\nMMAX2 Project Info:")
+    #     print("-------------------")
+    #     print(".mmax file        :", f'{Fore.BLUE}'+str(self.MMAX2_PROJECT.get_mmax2_path(full=True))+f'{Style.RESET_ALL}')
+    #     print("Basedata elements :", f'{Fore.BLUE}'+str(self.get_bd_count())+f'{Style.RESET_ALL}')
+    #     print("Markable levels   :")
+    #     for i in self.COMMONPATHS.MARKABLELEVELS:
+    #         def_att_string="Annotation scheme instance not available!"
+    #         default_attrib_list, _ = i.get_default_attributes()
+    #         if default_attrib_list != None:
+    #             def_att_string=""
+    #             for t,a,v,b in default_attrib_list:
+    #                 # Mark branching attributes 
+    #                 if b:
+    #                     a="<>"+str(a)
+    #                 def_att_string=def_att_string+str(a)+":"+str(v)+", "
+    #             if def_att_string!="":
+    #                 def_att_string=def_att_string[0:-2]
+    #             else:
+    #                 def_att_string="none defined"
+    #         print(" "+i.get_name().ljust(16)+" : "+f'{Fore.BLUE}'+ str(len(i.get_all_markables())).rjust(5)  +f'{Style.RESET_ALL}'+" markables [DEFAULT: "+f'{Fore.BLUE}'+def_att_string+f'{Style.RESET_ALL}]')
 
 
     def get_markablelevel_by_name(self, name, verbose=False):
@@ -686,6 +696,7 @@ class MMAX2MarkableLevel(object):
         if verbose: print("Writing to",as_file)
 
         with codecs.open(as_file, mode="w", encoding=self.ENCODING) as bout:
+            # print(self.ENCODING)
             bout.write('<?xml version="1.0" encoding="'+self.ENCODING.upper()+'"?>\n')
             bout.write('<!DOCTYPE markables SYSTEM '+self.DTD_PATH+'>\n')
             bout.write('<markables xmlns="'+str(self.NAMESPACE)+'">\n')
@@ -894,7 +905,7 @@ class MMAX2MarkableLevel(object):
         #if verbose: print("Loading markables from", markable_path+self.FILE, file=sys.stderr)
         if verbose: print("Loading markables from", os.path.realpath(markable_path+self.FILE), file=sys.stderr)
         try:
-            with open(markable_path+self.FILE,'r') as ma_in:
+            with codecs.open(markable_path+self.FILE,'r', encoding=self.ENCODING) as ma_in:
                 soup=bs(ma_in.read(), 'lxml')
                 #self.NAMESPACE='xmlns="'+soup.find("markables")['xmlns']+'"'
                 # This would give preference to the ns in the markable file ...
@@ -1102,7 +1113,7 @@ class MMAX2Project(object):                                       #
         return self.BASEDATA[bdtype]
 
     def write(self):
-        with open(self.FILE, mode="w") as bout:
+        with codecs.open(self.FILE, mode="w", encoding="UTF-8") as bout:
             bout.write('<?xml version="1.0"?>\n')
             bout.write("<mmax_project>\n")
             bout.write("<words>"+self.WORDS_FILE+"</words>\n")
@@ -1111,7 +1122,7 @@ class MMAX2Project(object):                                       #
             bout.write('</mmax_project>\n')
 
     def read(self, verbose=False):
-        with open(self.FILE, mode="r") as rin:
+        with codecs.open(self.FILE, mode="r", encoding="UTF-8") as rin:
             if verbose: print("Reading .mmax file at "+str(self.FILE), file=sys.stderr)
             soup = bs(rin.read(), 'lxml')
             try:
@@ -1345,10 +1356,13 @@ class MMAX2Markable(object):
         st='<markable id="'+self.ID+'" span="'+spanlists_to_span(self.SPANLISTS)+'" mmax_level="'+self.LEVEL.get_name()+'"'
         # st='<markable id="'+self.ID+'" span="'+self.bd_list_to_spanlists(spanlists_to_span(self.SPANLISTS))+'" mmax_level="'+self.LEVEL.get_name()+'"'
         for k in sorted(self.ATTRIBUTES):
+            # print(k, self.ATTRIBUTES[k])
         #for (k,v) in self.ATTRIBUTES.items():
             st=st+' '+str(k)+'="'+str(escape(self.ATTRIBUTES[k]))+'"'
         st=st+'/>'
-        return st
+        # Encoding is ok here
+        # print(st)
+        return st        
 
     def render_string(self, markup_level_name="", brackets=False, mapping=False):
         # This renders self as string by passing self.SPANLISTS to basedata rendering.
@@ -1486,21 +1500,21 @@ class MMAX2CommonPaths(object):                               #
 
     def write_scheme_stub(self, for_levelname):
         if not os.path.exists(self.DISCOURSE.get_mmax2_path(full=False)[0:-1]+self.SCHEME_PATH+for_levelname+"_scheme.xml"):
-            with open(self.DISCOURSE.get_mmax2_path(full=False)[0:-1]+self.SCHEME_PATH+for_levelname+"_scheme.xml","w") as sout:
+            with codecs.open(self.DISCOURSE.get_mmax2_path(full=False)[0:-1]+self.SCHEME_PATH+for_levelname+"_scheme.xml","w", encoding=self.ENCODING) as sout:
                 sout.write(SCHEME_STUB)
         else:
             print(self.DISCOURSE.get_mmax2_path(full=False)[0:-1]+self.SCHEME_PATH+for_levelname+"_scheme.xml exists!")
 
     def write_customization_stub(self, for_levelname):
         if not os.path.exists(self.DISCOURSE.get_mmax2_path(full=False)[0:-1]+self.CUSTOMIZATION_PATH+for_levelname+"_customization.xml"):
-            with open(self.DISCOURSE.get_mmax2_path(full=False)[0:-1]+self.CUSTOMIZATION_PATH+for_levelname+"_customization.xml","w") as sout:
+            with codecs.open(self.DISCOURSE.get_mmax2_path(full=False)[0:-1]+self.CUSTOMIZATION_PATH+for_levelname+"_customization.xml","w",encoding=self.ENCODING) as sout:
                 sout.write(CUSTOMIZATION_STUB)
         else:
             print(self.DISCOURSE.get_mmax2_path(full=False)[0:-1]+self.CUSTOMIZATION_PATH+for_levelname+"_customization.xml exists!")
 
     def write_style_stub(self):
         if not os.path.exists(self.DISCOURSE.get_mmax2_path(full=False)[0:-1]+self.STYLE_PATH+"/generic_nongui_style.xsl"):
-            with open(self.DISCOURSE.get_mmax2_path(full=False)[0:-1]+self.STYLE_PATH+"/generic_nongui_style.xsl","w") as sout:
+            with codecs.open(self.DISCOURSE.get_mmax2_path(full=False)[0:-1]+self.STYLE_PATH+"/generic_nongui_style.xsl","w", encoding=self.ENCODING) as sout:
                 sout.write(STYLE_STUB)
         else:
             print(self.DISCOURSE.get_mmax2_path(full=False)[0:-1]+self.STYLE_PATH+"/generic_nongui_style.xsl exists!")
@@ -1566,7 +1580,7 @@ class MMAX2CommonPaths(object):                               #
                     os.rename(self.FILE,bak_name)
                 except Exception as ex:
                     print("Could not create backup!",ex)
-            with open(self.FILE, mode="w") as bout:
+            with codecs.open(self.FILE, mode="w", encoding=self.ENCODING) as bout:
                 bout.write('<?xml version="1.0"?>\n')
                 bout.write("<common_paths>\n")
                 bout.write("<scheme_path>"          +self.SCHEME_PATH+"</scheme_path>\n")
@@ -1595,7 +1609,7 @@ class MMAX2CommonPaths(object):                               #
 
 
     def read(self, verbose=False):
-        with open(self.FILE, mode="r") as rin:
+        with codecs.open(self.FILE, mode="r", encoding="UTF-8") as rin:
             #if verbose: print("Reading common paths info from "+str(self.FILE), file=sys.stderr)
             if verbose: print("Reading common paths info from "+str(os.path.realpath(self.FILE)), file=sys.stderr)
             soup = bs(rin.read(), 'lxml')
@@ -2061,7 +2075,6 @@ class Basedata(object):
     def set_attribute_value_for(self, bd_id, att, val):
         pos_to_change=self.BDID2LISTPOS[bd_id]
         st, bid, dpos, atts = self.DCELEMENTS[pos_to_change]
-#       print(atts,st)
         if not atts:
             atts={}
         atts[att]=val
